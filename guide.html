@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guide – Contrôle d'implantation</title>
+<link rel="icon" href="/validation-leve/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+:root{--bg:#eef1f2;--panel:#fff;--ink:#18222a;--muted:#5b6a74;--line:#d5dcdf;--accent:#0b6e69;--accent-ink:#fff;--accent-soft:#d8eeec;--warn:#8a5a00;--warn-soft:#fbefd6;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;--f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;--f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0f1417;--panel:#161d21;--ink:#e3e9ec;--muted:#93a3ad;--line:#2a353b;--accent:#3cc4b8;--accent-ink:#06211f;--accent-soft:#143633;--warn:#f0c060;--warn-soft:#3a2e12;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1417;--panel:#161d21;--ink:#e3e9ec;--muted:#93a3ad;--line:#2a353b;--accent:#3cc4b8;--accent-ink:#06211f;--accent-soft:#143633;--warn:#f0c060;--warn-soft:#3a2e12;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--f-body)}
+.wrap{max-width:900px;margin:0 auto;padding:24px 16px 56px}
+.top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;border-bottom:3px solid var(--accent);padding-bottom:12px;margin-bottom:18px}
+h1{font:700 1.9rem/1.1 var(--f-display);margin:0}
+.sub{color:var(--muted);margin:4px 0 0}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{display:inline-block;border-radius:6px;padding:7px 13px;font-weight:600;font-size:.93rem;text-decoration:none;border:1px solid var(--accent)}
+.btn.go{background:var(--accent);color:var(--accent-ink)}.btn.back{color:var(--accent)}
+nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:18px}
+nav.toc ol{margin:6px 0 0;padding-left:20px;columns:2;column-gap:28px}
+@media (max-width:560px){nav.toc ol{columns:1}}
+nav.toc a,section a{color:var(--accent)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px}
+h2{font:700 1.35rem/1.2 var(--f-display);margin:0 0 8px}
+h3{font:700 1.08rem/1.2 var(--f-display);margin:14px 0 4px}
+p{margin:6px 0}
+ol.steps{margin:6px 0;padding-left:22px}ol.steps li{margin:4px 0}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.94rem}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:.85rem;text-transform:uppercase;letter-spacing:.03em}
+code,kbd{font-family:var(--f-mono);font-size:.86em;background:var(--accent-soft);padding:1px 5px;border-radius:4px;white-space:nowrap}
+.k{font-family:var(--f-display);font-weight:700;letter-spacing:.03em;white-space:nowrap}
+.tip{background:var(--accent-soft);border-radius:8px;padding:8px 12px;margin:8px 0}
+.warn{background:var(--warn-soft);border-left:4px solid var(--warn);border-radius:6px;padding:8px 12px;margin:8px 0}
+pre{font-family:var(--f-mono);font-size:.85rem;background:var(--accent-soft);padding:10px 12px;border-radius:8px;overflow-x:auto;margin:6px 0}
+@media print{.btns,nav.toc{display:none}section{break-inside:avoid;border:none;padding:0}body{background:#fff}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Contrôle d'implantation — guide d'utilisation</h1>
+      <p class="sub">Comparer les points levés au plan DXF et produire le rapport de contrôle</p>
+    </div>
+    <div class="btns">
+      <a class="btn back" href="/">← Boîte à outils</a>
+      <a class="btn go" href="controle-implantation.html">Ouvrir l'outil</a>
+    </div>
+  </div>
+
+  <nav class="toc" aria-label="Sommaire"><b>Sommaire</b>
+    <ol>
+      <li><a href="#quand">Quand utiliser l'outil</a></li>
+      <li><a href="#fichiers">Fichiers nécessaires</a></li>
+      <li><a href="#etapes">Les étapes en bref</a></li>
+      <li><a href="#regles">Règles d'analyse</a></li>
+      <li><a href="#codes">Codes du levé → calques</a></li>
+      <li><a href="#couleurs">Lire le plan</a></li>
+      <li><a href="#points">Onglet Points</a></li>
+      <li><a href="#axes">Onglet Axes</a></li>
+      <li><a href="#rapport">Onglet Rapport</a></li>
+      <li><a href="#dossier">Enregistrer le travail</a></li>
+      <li><a href="#faq">Questions fréquentes</a></li>
+    </ol>
+  </nav>
+
+  <section id="quand">
+    <h2>1. Quand utiliser l'outil</h2>
+    <p>Après une implantation ou un levé de vérification (colonnes, semelles, murs, axes d'un bâtiment, bordures…) pour savoir si chaque point est <b>conforme</b> au plan, et produire un rapport à remettre au client ou au chantier.</p>
+    <div class="tip">Le plan et les points sont lus dans votre navigateur : rien n'est envoyé sur Internet. À l'ouverture, un exemple <b>fictif</b> est chargé pour vous exercer.</div>
+  </section>
+
+  <section id="fichiers">
+    <h2>2. Fichiers nécessaires</h2>
+    <div class="tbl"><table>
+      <tr><th>Bouton</th><th>Fichier</th><th>Remarques</th></tr>
+      <tr><td class="k">Plan DXF…</td><td>Plan théorique <code>.dxf</code></td><td>Exporté de Civil 3D / AutoCAD, dans le même système de coordonnées que le levé.</td></tr>
+      <tr><td class="k">Points levés…</td><td><code>.txt</code> / <code>.csv</code></td><td>P,N,E,Z,D ou P,E,N,Z,D : choisissez l'ordre sous le nom du fichier. Plusieurs fichiers peuvent être ajoutés.</td></tr>
+      <tr><td class="k">Ouvrir un dossier…</td><td>Dossier enregistré</td><td>Reprend un contrôle déjà commencé (voir section 10).</td></tr>
+    </table></div>
+    <p><span class="k">×</span> à côté d'un fichier le retire.</p>
+  </section>
+
+  <section id="etapes">
+    <h2>3. Les étapes en bref</h2>
+    <ol class="steps">
+      <li>Ouvrir le <b>plan DXF</b>, puis les <b>points levés</b>.</li>
+      <li>Vérifier les <b>règles d'analyse</b> (tolérances) du mandat.</li>
+      <li>Onglet <span class="k">Codes</span> : vérifier que chaque code du levé est associé au bon calque du plan et a le bon rôle.</li>
+      <li>Regarder le plan : les points <b>hors tolérance</b> et <b>douteux</b> ressortent en couleur. Onglet <span class="k">Points</span> pour la liste.</li>
+      <li>Onglet <span class="k">Axes</span> : <span class="k">Détecter les axes du plan</span> pour exprimer les écarts par axe du bâtiment.</li>
+      <li>Onglet <span class="k">Rapport</span> : choisir les points, remplir l'en-tête, <span class="k">Aperçu du rapport</span>, puis <span class="k">Télécharger (HTML)</span>.</li>
+      <li><span class="k">Enregistrer le dossier</span> pour pouvoir y revenir.</li>
+    </ol>
+  </section>
+
+  <section id="regles">
+    <h2>4. Règles d'analyse</h2>
+    <div class="tbl"><table>
+      <tr><th>Réglage</th><th>Rôle</th></tr>
+      <tr><td>Tolérance en plan (mm)</td><td>Écart horizontal maximal accepté : au-delà, le point est <b>hors tolérance</b>.</td></tr>
+      <tr><td>Tolérance en Z (mm)</td><td>Écart vertical maximal accepté.</td></tr>
+      <tr><td>Rayon d'accroche sommet (mm)</td><td>Si un coin du plan est à moins de cette distance, l'écart est mesuré <b>au coin</b>.</td></tr>
+      <tr><td>Douteux au-delà de (mm)</td><td>Écart trop grand pour être une simple erreur d'implantation : le point est probablement associé au mauvais élément. À vérifier.</td></tr>
+      <tr><td>Doublons à moins de (mm)</td><td>Deux points levés plus proches que cette distance sont signalés en double.</td></tr>
+    </table></div>
+    <p><b>Méthode Auto :</b> écart au coin si un sommet est dans le rayon d'accroche ; sinon écart perpendiculaire à la ligne (EC, positif à droite).</p>
+  </section>
+
+  <section id="codes">
+    <h2>5. Codes du levé → calques du plan</h2>
+    <p>Chaque code est associé automatiquement à un calque par son nom abrégé (8 caractères, comme Trimble). Pour chaque code :</p>
+    <ul>
+      <li><b>Rôle</b> : Implantation (contrôlé), Station, Référence / cible, Vérification (fermeture). Les stations et références ne sont pas contrôlées.</li>
+      <li><b>Méthode</b> : Auto, Sommet (forcer l'écart au coin, pour un code de coins), Ligne (EC), ou Ignorer.</li>
+      <li><b>Calques</b> : <span class="k">+ calque…</span> pour en ajouter, <span class="k">×</span> pour en retirer.</li>
+    </ul>
+    <p>Onglet <span class="k">Calques</span> : afficher tous les calques du plan ou seulement ceux associés.</p>
+  </section>
+
+  <section id="couleurs">
+    <h2>6. Lire le plan</h2>
+    <p>Légende : <b>Conforme</b>, <b>Hors tolérance</b>, <b>Association douteuse</b>, <b>Exclu</b>, <b>Non classé</b>, <b>Station</b>, <b>Référence / cible</b>.</p>
+    <p><span class="k">Vecteurs ×100</span> trace les écarts agrandis 100 fois, pour voir d'un coup d'œil le sens des erreurs. <span class="k">Numéros</span> affiche les numéros de points ; <span class="k">Ajuster</span> recadre ; <span class="k">2D</span> / <span class="k">3D</span> change la vue.</p>
+    <p><span class="k">Sélection ▭</span> ou <kbd>Maj</kbd> + glisser sélectionne plusieurs points.</p>
+  </section>
+
+  <section id="points">
+    <h2>7. Onglet Points</h2>
+    <p>Filtres : Tous, Contrôlés, Hors tol., Douteux, Doublons, Exclus, Non classés, Stations / réf., Liés à un axe, Au rapport.</p>
+    <p>Touchez une ligne pour localiser le point sur le plan et ouvrir sa fiche. <span class="k">Ajouter les … points affichés au rapport</span> ajoute tout le filtre en cours.</p>
+    <p>En bas : moyenne, RMS et écart maximal en plan (sans les douteux), et <span class="k">Télécharger tous les points (CSV)</span>.</p>
+  </section>
+
+  <section id="axes">
+    <h2>8. Onglet Axes</h2>
+    <p><span class="k">Détecter les axes du plan</span> lit les axes du bâtiment ; <span class="k">Ajouter un axe (clic sur une ligne)</span> pour en ajouter un.</p>
+    <p>Chaque point est lié à l'axe le plus proche dans chaque direction (au plus deux axes) : le rapport donne alors l'écart par rapport à l'axe 1, l'axe A, etc. Pour corriger : sélectionnez un point puis cliquez l'axe voulu sur le plan, ou <span class="k">Délier la sélection</span>.</p>
+    <p><span class="k">Exporter les axes (.json)</span> / <span class="k">Importer des axes…</span> pour réutiliser les mêmes axes au prochain contrôle du chantier.</p>
+  </section>
+
+  <section id="rapport">
+    <h2>9. Onglet Rapport</h2>
+    <ol class="steps">
+      <li>Choisir les points : <span class="k">+ Hors tolérance</span>, <span class="k">+ Tous les contrôlés</span>, <span class="k">+ Sélection</span> (ou <span class="k">Vider</span>).</li>
+      <li>Remplir l'en-tête : Projet, N° de dossier, Client, Lieu, Préparé par, Objet, Remarques.</li>
+      <li>Choisir les sections : par axe, par point, croquis, coordonnées, stations et références.</li>
+      <li><span class="k">Aperçu du rapport</span>, puis <span class="k">Télécharger (HTML)</span> ou <span class="k">CSV du rapport</span>.</li>
+    </ol>
+    <p>Le fichier HTML s'ouvre dans n'importe quel navigateur : <b>Imprimer → Enregistrer en PDF</b> pour l'archiver. Le CSV utilise le point-virgule et la virgule décimale (Excel en français).</p>
+  </section>
+
+  <section id="dossier">
+    <h2>10. Enregistrer le travail</h2>
+    <p><span class="k">Enregistrer le dossier</span> sauvegarde le plan, les points, les associations, les axes et le rapport. Rangez-le dans le dossier du mandat (jamais sur GitHub). <span class="k">Ouvrir un dossier…</span> pour reprendre.</p>
+    <div class="warn">Les plans et levés de mandat ne doivent jamais être déposés dans un dépôt public. L'outil est public, vos données restent sur votre poste.</div>
+  </section>
+
+  <section id="faq">
+    <h2>11. Questions fréquentes</h2>
+    <h3>Beaucoup de points « douteux »</h3>
+    <p>Vérifiez l'onglet Codes : le code est peut-être associé au mauvais calque, ou le plan et le levé ne sont pas dans le même système de coordonnées.</p>
+    <h3>Les écarts ne sont pas mesurés au coin</h3>
+    <p>Augmentez le rayon d'accroche sommet ou choisissez la méthode <b>Sommet</b> pour ce code.</p>
+    <h3>L'outil affiche une ancienne version</h3>
+    <p>Rechargez la page avec <kbd>Ctrl</kbd>+<kbd>F5</kbd>.</p>
+  </section>
+</div>
+</body>
+</html>
