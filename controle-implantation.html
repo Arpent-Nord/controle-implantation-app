@@ -1,0 +1,1596 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>[hidden]{display:none!important}body{margin:0}</style></head><body>
+<title>Contrôle d'implantation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: field instrument — plan view on the left (DXF faint, staked points loud), control panel on the right; stacks on phones. */
+:root{
+  --bg:#eef1ef; --surface:#ffffff; --surface-2:#f6f8f7; --ink:#16201c; --ink-2:#4b5853; --ink-3:#86938d; --line:#d9e0dc;
+  --accent:#0d6b74; --accent-ink:#ffffff; --accent-soft:#d7ecee;
+  --plan-bg:#fbfcfb; --plan-line:#b9c4bf; --plan-line-strong:#5f6d67; --plan-text:#8c9893;
+  --ok:#23824a; --ok-soft:#dcf0e3; --out:#c9362b; --out-soft:#f8dedb; --doubt:#7d4cc4; --doubt-soft:#ebe2f8;
+  --ex:#9aa59f; --nc:#b3bcb8; --sel:#f07316;
+  --f-ui:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1513; --surface:#18201d; --surface-2:#1f2925; --ink:#e7eeea; --ink-2:#a9b6b0; --ink-3:#6f7d77; --line:#2c3833;
+  --accent:#4fb8c2; --accent-ink:#06211f; --accent-soft:#163a3d;
+  --plan-bg:#111916; --plan-line:#34433d; --plan-line-strong:#7d8f87; --plan-text:#5d6c66;
+  --ok:#4cc27a; --ok-soft:#173826; --out:#ff6b5e; --out-soft:#43201c; --doubt:#b48cf0; --doubt-soft:#2e2445;
+  --ex:#5f6b66; --nc:#4f5b56; --sel:#ff9a4a; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0f1513; --surface:#18201d; --surface-2:#1f2925; --ink:#e7eeea; --ink-2:#a9b6b0; --ink-3:#6f7d77; --line:#2c3833;
+  --accent:#4fb8c2; --accent-ink:#06211f; --accent-soft:#163a3d;
+  --plan-bg:#111916; --plan-line:#34433d; --plan-line-strong:#7d8f87; --plan-text:#5d6c66;
+  --ok:#4cc27a; --ok-soft:#173826; --out:#ff6b5e; --out-soft:#43201c; --doubt:#b48cf0; --doubt-soft:#2e2445;
+  --ex:#5f6b66; --nc:#4f5b56; --sel:#ff9a4a; color-scheme:dark }
+
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.4}
+*{box-sizing:border-box}
+button,input,select{font:inherit;color:inherit}
+.app{height:100%;display:grid;grid-template-rows:auto auto 1fr;gap:10px;padding-inline:16px;padding-block:12px}
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.brand{display:flex;flex-direction:column;margin-right:auto;min-width:0}
+.brand h1{font-family:var(--f-display);font-weight:600;font-size:22px;letter-spacing:.01em;margin:0;line-height:1.1;text-wrap:balance}
+.brand span{font-size:12px;color:var(--ink-2)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:7px 12px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--ink-3)}
+.btn:focus-visible,.tab:focus-visible,select:focus-visible,input:focus-visible,.row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{padding:4px 9px;font-size:13px}
+.btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:7px 12px;cursor:pointer;font-weight:600;font-family:var(--f-display);font-size:15px;letter-spacing:.04em}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.files{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--ink-2)}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 4px 3px 10px;max-width:100%}
+.chip b{font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.chip .x{border:0;background:transparent;cursor:pointer;color:var(--ink-3);padding:0 6px;font-size:15px;line-height:1}
+.chip input{margin:0}
+.banner{background:var(--accent-soft);color:var(--ink);border-radius:var(--r);padding:6px 10px;font-size:12.5px}
+.notice{color:var(--ink-2)}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 410px;gap:12px;min-height:0}
+.planwrap{position:relative;background:var(--plan-bg);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;min-height:0;touch-action:none}
+canvas#plan{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+.plantools{position:absolute;top:8px;left:8px;right:8px;display:flex;flex-wrap:wrap;gap:6px;pointer-events:none}
+.plantools > *{pointer-events:auto}
+.legend{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:3px;background:color-mix(in srgb,var(--surface) 88%,transparent);border:1px solid var(--line);border-radius:var(--r);padding:6px 9px;font-size:12px;pointer-events:none}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.coords{position:absolute;left:8px;bottom:8px;font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);background:color-mix(in srgb,var(--surface) 85%,transparent);padding:2px 6px;border-radius:4px;pointer-events:none}
+.scalebar{position:absolute;right:10px;bottom:10px;font-family:var(--f-mono);font-size:11px;color:var(--ink-2);text-align:center;pointer-events:none}
+.scalebar div{height:5px;border:1.5px solid var(--ink-2);border-top:0;margin-bottom:2px}
+.detail{position:absolute;left:8px;bottom:34px;width:min(360px,calc(100% - 16px));background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 6px 24px rgba(0,0,0,.14);padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:calc(100% - 90px);overflow:auto}
+.detail h3{margin:0;font-family:var(--f-display);font-size:19px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kv{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:2px 10px;font-size:12.5px}
+.kv dt{color:var(--ink-3)}
+.kv dd{margin:0;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.ctl{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:13px}
+.ctl label{color:var(--ink-2)}
+select,input[type=number],input[type=text]{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:5px 7px;min-width:0;width:100%}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;min-height:0;min-width:0}
+.tabs{display:flex;border-bottom:1px solid var(--line);padding:0 6px;gap:2px;overflow-x:auto}
+.tab{border:0;background:transparent;padding:10px 10px 8px;cursor:pointer;font-family:var(--f-display);font-size:16px;font-weight:600;letter-spacing:.03em;color:var(--ink-3);border-bottom:2px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab .n{font-family:var(--f-mono);font-size:11px;font-weight:400;color:var(--ink-3);margin-left:4px}
+.pane{overflow:auto;padding:12px;display:flex;flex-direction:column;gap:12px;min-height:0;flex:1}
+.sect h4{margin:0 0 6px;font-family:var(--f-display);font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.help{font-size:12.5px;color:var(--ink-2);margin:0;max-width:65ch}
+.rules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.rules label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink-2)}
+.rules .unit{display:flex;align-items:center;gap:6px}
+.rules .unit span{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-3)}
+.code{border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;display:flex;flex-direction:column;gap:6px;background:var(--surface-2)}
+.code.off{opacity:.75}
+.code .hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.code .nm{font-family:var(--f-mono);font-weight:500;font-size:13.5px}
+.code .ct{font-size:12px;color:var(--ink-3)}
+.code .hd select{width:auto;margin-left:auto;font-size:12.5px;padding:3px 6px}
+.lays{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.lay{font-family:var(--f-mono);font-size:11.5px;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 2px 1px 6px;display:inline-flex;align-items:center;gap:2px}
+.lay button{border:0;background:transparent;cursor:pointer;color:var(--ink-3);padding:0 4px}
+.lays select{width:auto;font-size:12px;padding:2px 4px}
+.zrow{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)}
+.zrow input{width:96px}
+.pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.out{background:var(--out-soft);color:var(--out)}
+.pill.doubt{background:var(--doubt-soft);color:var(--doubt)}
+.pill.ex,.pill.nc{background:var(--surface-2);color:var(--ink-3);border:1px solid var(--line)}
+.pill.st{background:var(--surface-2);color:var(--ink);border:1px solid var(--ink-3)}
+.pill.dup{background:transparent;color:var(--doubt);border:1px dashed var(--doubt)}
+.filters{display:flex;flex-wrap:wrap;gap:5px}
+.filters button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:12.5px;cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:6px;max-height:100%}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:5px 7px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{position:sticky;top:0;background:var(--surface-2);font-weight:600;font-size:11.5px;color:var(--ink-2);cursor:pointer;user-select:none;z-index:1}
+td.num,th.num{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+td.mono{font-family:var(--f-mono)}
+tr.row{cursor:pointer}
+tr.row:hover td{background:var(--surface-2)}
+tr.row.sel td{background:var(--accent-soft)}
+tr.row.isex td{color:var(--ink-3)}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tile{border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.tile b{font-family:var(--f-display);font-size:26px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.tile span{font-size:11.5px;color:var(--ink-2)}
+.tile.ok b{color:var(--ok)} .tile.out b{color:var(--out)} .tile.doubt b{color:var(--doubt)}
+.bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--surface-2);border:1px solid var(--line)}
+.bar i{display:block;height:100%}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.laylist{display:flex;flex-direction:column;gap:2px}
+.laylist label{display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:12.5px;padding:3px 4px;border-radius:4px}
+.laylist label:hover{background:var(--surface-2)}
+.laylist .meta{margin-left:auto;font-size:11px;color:var(--ink-3)}
+.drop{position:absolute;inset:0;background:color-mix(in srgb,var(--accent) 18%,transparent);border:2px dashed var(--accent);border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-family:var(--f-display);font-size:22px;font-weight:600;color:var(--ink);z-index:5}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:var(--r);font-size:13px;z-index:20;max-width:calc(100% - 32px)}
+textarea#csvfallback{width:100%;height:140px;font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--ink)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (max-width:960px){
+  html,body{height:auto}
+  .app{height:auto}
+  .main{grid-template-columns:minmax(0,1fr);grid-template-rows:62vh auto}
+  .panel{max-height:none}
+  .pane{max-height:75vh}
+}
+.axrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:6px;align-items:center;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2)}
+.axrow.on{border-color:var(--accent);background:var(--accent-soft)}
+.axrow input[type=text]{font-family:var(--f-mono);font-weight:500;width:80px}
+.axrow .meta{font-size:11.5px;color:var(--ink-3);font-family:var(--f-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.axrow button{border:0;background:transparent;cursor:pointer;color:var(--ink-3);padding:2px 6px;font-size:13px}
+.axlist{display:flex;flex-direction:column;gap:5px}
+.axchips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.axchip{font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 9px;cursor:pointer}
+.axchip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.axchip small{opacity:.7;margin-left:3px}
+.axres{font-size:12px;font-family:var(--f-mono);display:grid;grid-template-columns:auto 1fr;gap:1px 10px}
+.mini{display:flex;align-items:center;gap:6px;font-size:13px}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.fields label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink-2)}
+.fields label.wide{grid-column:1/-1}
+.opts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;align-items:center}
+.opts label{display:inline-flex;align-items:center;gap:5px}
+td.chk,th.chk{width:28px;text-align:center;padding-inline:4px}
+.modal{position:fixed;inset:0;z-index:30;background:color-mix(in srgb,var(--ink) 45%,transparent);display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top,0px)) 16px calc(12px + env(safe-area-inset-bottom,0px))}
+.modal .bar2{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r) var(--r) 0 0;padding:8px 10px}
+.modal .bar2 h2{margin:0 auto 0 0;font-family:var(--f-display);font-size:20px;font-weight:600}
+.modal .sheet{flex:1;overflow:auto;background:#e9ecea;border:1px solid var(--line);border-top:0;border-radius:0 0 var(--r) var(--r);padding:16px}
+.modal .page{background:#fff;color:#1b1f1d;max-width:900px;margin:0 auto;box-shadow:0 2px 14px rgba(0,0,0,.15)}
+@media (max-width:600px){.legend{display:none}.detail{max-height:calc(100% - 60px)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Contrôle d'implantation</h1>
+      <span>Points levés comparés au plan DXF · écarts par élément</span>
+    </div>
+    <div class="seg" role="group" aria-label="Mode de traitement">
+      <button id="m2d" aria-pressed="true" title="Contrôle planimétrique (E, N)">2D</button>
+      <button id="m3d" aria-pressed="false" title="Ajoute le contrôle altimétrique (ΔZ)">3D</button>
+    </div>
+    <label class="btn"><input type="file" id="fDxf" accept=".dxf" class="sr">Plan DXF…</label>
+    <label class="btn primary"><input type="file" id="fPts" accept=".txt,.csv,.xyz,.asc,.pts" multiple class="sr">Points levés…</label>
+    <label class="btn" title="Ouvrir un dossier d'implantation partagé (.json)"><input type="file" id="fDos" accept=".json" class="sr">Ouvrir un dossier…</label>
+    <button class="btn" id="bDosSave" title="Enregistre axes, codes, rôles, liens et choix du rapport dans un fichier .json versionné">Enregistrer le dossier</button>
+  </header>
+  <div class="files" id="files"></div>
+  <div class="main">
+    <div class="planwrap" id="planwrap">
+      <canvas id="plan" aria-label="Vue en plan : DXF en arrière-plan, points levés au premier plan"></canvas>
+      <div class="plantools">
+        <button class="btn small" id="bFit" title="Ajuster la vue aux points">Ajuster</button>
+        <button class="btn small" id="bBox" aria-pressed="false" title="Sélection par rectangle (ou Maj + glisser)">Sélection ▭</button>
+        <button class="btn small" id="bVec" aria-pressed="false" title="Afficher les vecteurs d'écart amplifiés ×100">Vecteurs ×100</button>
+        <button class="btn small" id="bLbl" aria-pressed="true" title="Numéros de points">Numéros</button>
+      </div>
+      <div class="legend" id="legend">
+        <div><i style="background:var(--ok)"></i>Conforme</div>
+        <div><i style="background:var(--out)"></i>Hors tolérance</div>
+        <div><i style="background:var(--doubt)"></i>Association douteuse</div>
+        <div><i style="background:transparent;border:1.5px solid var(--ex)"></i>Exclu</div>
+        <div><i style="background:var(--nc)"></i>Non classé</div>
+        <div><i style="background:transparent;border-radius:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid var(--ink-2);width:0;height:0"></i>Station</div>
+        <div><i style="background:transparent;border:2px solid var(--ink-2)"></i>Référence / cible</div>
+      </div>
+      <div class="coords" id="coords">—</div>
+      <div class="scalebar" id="scalebar"></div>
+      <div class="detail" id="detail" hidden></div>
+      <div class="drop" id="drop" hidden>Déposez le DXF, les fichiers de points et/ou le dossier (.json)</div>
+    </div>
+    <section class="panel" aria-label="Analyse">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="codes" aria-selected="true">Codes<span class="n" id="nCodes"></span></button>
+        <button class="tab" role="tab" data-tab="points" aria-selected="false">Points<span class="n" id="nPts"></span></button>
+        <button class="tab" role="tab" data-tab="axes" aria-selected="false">Axes<span class="n" id="nAxes"></span></button>
+        <button class="tab" role="tab" data-tab="report" aria-selected="false">Rapport<span class="n" id="nRep"></span></button>
+        <button class="tab" role="tab" data-tab="layers" aria-selected="false">Calques<span class="n" id="nLays"></span></button>
+      </div>
+      <div class="pane" id="pane-codes"></div>
+      <div class="pane" id="pane-points" hidden></div>
+      <div class="pane" id="pane-axes" hidden></div>
+      <div class="pane" id="pane-report" hidden></div>
+      <div class="pane" id="pane-layers" hidden></div>
+    </section>
+  </div>
+</div>
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-label="Aperçu du rapport d'implantation">
+  <div class="bar2"><h2>Aperçu du rapport</h2>
+    <button class="btn primary" id="mHtml">Télécharger (HTML imprimable)</button>
+    <button class="btn" id="mCsv">Télécharger (CSV)</button>
+    <button class="btn" id="mClose">Fermer</button></div>
+  <div class="sheet"><div class="page" id="rptPage"></div></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+/* ============================================================
+   État
+   ============================================================ */
+const S = {
+  dxf:null,            // {name, layers:{name:{color,segs:[],verts:[],texts:[],n,has3D}}, ox, oy, bbox}
+  files:[],            // {name, on, order:'PNEZD'|'PENZD', pts:[]}
+  mode:'2D',
+  tol:0.010, tolZ:0.010, snap:0.100, doubt:0.200, dup:0.030,
+  codeLayers:{},       // code -> [layer names]
+  codeMethod:{},       // code -> 'auto'|'vertex'|'line'|'ignore'
+  codeZ:{},            // code -> design elevation (number) for 3D when DXF has no Z
+  dupKeep:{},          // groupKey -> uid kept
+  layerOn:{},
+  sel:new Set(), filter:'all', sort:{k:'idx',dir:1}, tab:'codes',
+  boxMode:false, vec:false, labels:true, example:false, csvShown:false,
+  axes:[],             // {id,name,x1,y1,x2,y2} coordonnées absolues (E,N) ; sens normalisé
+  axisSel:null, pickAxis:false, axisMax:1.5,
+  pstate:{},           // pkey -> {exMode,method,layer,note,axes:[],rep}
+  rep:{projet:'',mandat:'',client:'',lieu:'',arpenteur:'',notes:'',group:'axis',sketch:true,coords:true,refs:true,only:'all'},
+  codeRole:{}, dossier:null, pendingDossier:null
+};
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f3 = v=> v==null||isNaN(v) ? '—' : v.toFixed(3);
+const mm = v=> v==null||isNaN(v) ? '—' : (v*1000).toFixed(1);
+const smm = v=> v==null||isNaN(v) ? '—' : ((v>=0?'+':'')+(v*1000).toFixed(1));
+function store(k,v){try{localStorage.setItem('ctrlimp.'+k,JSON.stringify(v))}catch(e){}}
+function load(k,d){try{const v=localStorage.getItem('ctrlimp.'+k);return v?JSON.parse(v):d}catch(e){return d}}
+function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600)}
+function layerKey(n){return String(n).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)}
+
+/* ============================================================
+   Lecture DXF (LINE, LWPOLYLINE, POLYLINE, ARC, CIRCLE, POINT, 3DFACE,
+   SPLINE, ELLIPSE, TEXT, MTEXT, INSERT/DIMENSION avec blocs imbriqués)
+   ============================================================ */
+function parseDXF(text, name){
+  const L = text.split(/\r\n|\r|\n/);
+  const P = [];
+  for(let i=0;i+1<L.length;i+=2){ const c=parseInt(L[i],10); if(isNaN(c)) { i--; continue; } P.push([c, L[i+1]]); }
+  const layerColors={}, blocks={}, top=[];
+  let i=0, section=null, curBlock=null;
+  function readEnt(j){ const t=P[j][1].trim(); const g=[]; j++; while(j<P.length && P[j][0]!==0){ g.push(P[j]); j++; } return {t,g,next:j}; }
+  while(i<P.length){
+    const [c,v]=P[i]; const vv=v.trim();
+    if(c===0 && vv==='SECTION'){ section=(P[i+1]&&P[i+1][1].trim())||''; i+=2; continue; }
+    if(c===0 && vv==='ENDSEC'){ section=null; i++; continue; }
+    if(c===0 && vv==='EOF') break;
+    if(c!==0){ i++; continue; }
+    const e=readEnt(i); i=e.next;
+    if(section==='TABLES' && e.t==='LAYER'){ const n=gv(e.g,2); if(n!=null) layerColors[n]=+gv(e.g,62,7); continue; }
+    if(section==='BLOCKS'){
+      if(e.t==='BLOCK'){ curBlock={name:gv(e.g,2), bx:+gv(e.g,10,0), by:+gv(e.g,20,0), bz:+gv(e.g,30,0), ents:[]}; blocks[curBlock.name]=curBlock; continue; }
+      if(e.t==='ENDBLK'){ curBlock=null; continue; }
+      if(curBlock){ pushEnt(curBlock.ents, e); }
+      continue;
+    }
+    if(section==='ENTITIES') pushEnt(top, e);
+  }
+  function pushEnt(arr,e){
+    if(e.t==='VERTEX'){ const last=arr[arr.length-1]; if(last && last.t==='POLYLINE'){ (last.vx=last.vx||[]).push(e.g); } return; }
+    if(e.t==='SEQEND' || e.t==='ATTRIB' || e.t==='ATTDEF') return;
+    arr.push(e);
+  }
+  // géométrie
+  const layers={};
+  const LY = n=> layers[n] || (layers[n]={name:n,color:layerColors[n]??7,segs:[],verts:[],texts:[],n:0,has3D:false});
+  const ID = {a:1,b:0,c:0,d:1,e:0,f:0,sz:1,z:0};
+  const tf = (m,x,y,z)=>[m.a*x+m.c*y+m.e, m.b*x+m.d*y+m.f, (z||0)*m.sz+m.z];
+  function comp(p,q){ return {a:p.a*q.a+p.c*q.b, b:p.b*q.a+p.d*q.b, c:p.a*q.c+p.c*q.d, d:p.b*q.c+p.d*q.d, e:p.a*q.e+p.c*q.f+p.e, f:p.b*q.e+p.d*q.f+p.f, sz:p.sz*q.sz, z:p.sz*q.z+p.z}; }
+  function ocs(g){ return +gv(g,230,1) < 0 ? {a:-1,b:0,c:0,d:1,e:0,f:0,sz:1,z:0} : null; }
+  function addPoly(ly,m,pts,closed,mark){ // pts:[x,y,z] local
+    const W=pts.map(p=>tf(m,p[0],p[1],p[2]));
+    if(closed && W.length>2) W.push(W[0]);
+    for(let k=0;k+1<W.length;k++){ ly.segs.push(W[k][0],W[k][1],W[k][2],W[k+1][0],W[k+1][1],W[k+1][2]); }
+    if(mark) for(const p of mark){ const w=tf(m,p[0],p[1],p[2]); ly.verts.push(w[0],w[1],w[2]); }
+    for(const w of W) if(w[2]!==0) ly.has3D=true;
+    ly.n++;
+  }
+  function arcPts(cx,cy,z,r,a0,sweep){ // radians
+    const e=0.0005; const st = r>e ? 2*Math.acos(1-e/r) : Math.PI/4;
+    const n=Math.max(2,Math.min(720,Math.ceil(Math.abs(sweep)/st)));
+    const out=[]; for(let k=0;k<=n;k++){ const a=a0+sweep*k/n; out.push([cx+r*Math.cos(a), cy+r*Math.sin(a), z]); } return out;
+  }
+  function bulge(p1,p2,b,out){
+    const th=4*Math.atan(b), dx=p2[0]-p1[0], dy=p2[1]-p1[1], c=Math.hypot(dx,dy);
+    if(c<1e-12||Math.abs(b)<1e-9){ return; }
+    const r=c/(2*Math.sin(th/2)), h=r*Math.cos(th/2), nx=-dy/c, ny=dx/c;
+    const cx=(p1[0]+p2[0])/2+nx*h, cy=(p1[1]+p2[1])/2+ny*h;
+    const a0=Math.atan2(p1[1]-cy,p1[0]-cx);
+    const pts=arcPts(cx,cy,p1[2],Math.abs(r),a0,th); pts.shift(); pts.pop(); out.push(...pts);
+  }
+  function geom(e,m,inheritLayer,depth){
+    const g=e.g; let ln=gv(g,8,'0'); if(ln==='0' && inheritLayer) ln=inheritLayer;
+    const o=ocs(g); const mm2 = o? comp(m,o) : m;
+    const t=e.t;
+    if(t==='LINE'){ const a=[+gv(g,10),+gv(g,20),+gv(g,30,0)], b=[+gv(g,11),+gv(g,21),+gv(g,31,0)]; addPoly(LY(ln),m,[a,b],false,[a,b]); }
+    else if(t==='LWPOLYLINE'){
+      const el=+gv(g,38,0); const pts=[]; let cur=null;
+      for(const [c,v] of g){ if(c===10){ cur=[+v,0,el,0]; pts.push(cur);} else if(c===20&&cur) cur[1]=+v; else if(c===42&&cur) cur[3]=+v; }
+      const closed=(+gv(g,70,0)&1)===1; tessPoly(LY(ln),mm2,pts,closed);
+    }
+    else if(t==='POLYLINE'){
+      const fl=+gv(g,70,0); if(fl&64||fl&16) { return; } // mailles polyface : ignorées ici
+      const pts=(e.vx||[]).filter(vg=>!(+gv(vg,70,0)&16)).map(vg=>[+gv(vg,10),+gv(vg,20),+gv(vg,30,0),+gv(vg,42,0)]);
+      tessPoly(LY(ln),mm2,pts,(fl&1)===1);
+    }
+    else if(t==='ARC'){
+      const cx=+gv(g,10),cy=+gv(g,20),z=+gv(g,30,0),r=+gv(g,40); let a0=+gv(g,50)*Math.PI/180,a1=+gv(g,51)*Math.PI/180; let sw=a1-a0; while(sw<=0) sw+=2*Math.PI;
+      const pts=arcPts(cx,cy,z,r,a0,sw); addPoly(LY(ln),mm2,pts,false,[pts[0],pts[pts.length-1],[cx,cy,z]]);
+    }
+    else if(t==='CIRCLE'){ const cx=+gv(g,10),cy=+gv(g,20),z=+gv(g,30,0),r=+gv(g,40); const pts=arcPts(cx,cy,z,r,0,2*Math.PI); addPoly(LY(ln),mm2,pts,false,[[cx,cy,z]]); const w=tf(mm2,cx,cy,z); (LY(ln).marks=LY(ln).marks||[]).push(w[0],w[1]); }
+    else if(t==='ELLIPSE'){
+      const cx=+gv(g,10),cy=+gv(g,20),z=+gv(g,30,0),mx=+gv(g,11),my=+gv(g,21),ra=+gv(g,40,1); let p0=+gv(g,41,0),p1=+gv(g,42,2*Math.PI); if(p1<=p0)p1+=2*Math.PI;
+      const pts=[]; const n=96; for(let k=0;k<=n;k++){ const t2=p0+(p1-p0)*k/n, c=Math.cos(t2), s=Math.sin(t2); pts.push([cx+mx*c-my*ra*s, cy+my*c+mx*ra*s, z]); }
+      addPoly(LY(ln),m,pts,false,[[cx,cy,z]]);
+    }
+    else if(t==='SPLINE'){
+      const fit=[],ctl=[]; let cf=null,cc=null;
+      for(const [c,v] of g){ if(c===11){cf=[+v,0,0];fit.push(cf);} else if(c===21&&cf)cf[1]=+v; else if(c===31&&cf)cf[2]=+v; else if(c===10){cc=[+v,0,0];ctl.push(cc);} else if(c===20&&cc)cc[1]=+v; else if(c===30&&cc)cc[2]=+v; }
+      const pts=fit.length>1?fit:ctl; if(pts.length>1) addPoly(LY(ln),m,pts,false,[pts[0],pts[pts.length-1]]);
+    }
+    else if(t==='POINT'){ const p=[+gv(g,10),+gv(g,20),+gv(g,30,0)]; const w=tf(m,...p); const ly=LY(ln); ly.verts.push(w[0],w[1],w[2]); if(w[2]!==0) ly.has3D=true; ly.n++; ly.pts=(ly.pts||0)+1; }
+    else if(t==='3DFACE'){ const pts=[0,1,2,3].map(k=>[+gv(g,10+k),+gv(g,20+k),+gv(g,30+k,0)]); if(Math.hypot(pts[3][0]-pts[2][0],pts[3][1]-pts[2][1])<1e-9) pts.pop(); addPoly(LY(ln),m,pts,true,pts); }
+    else if(t==='TEXT'||t==='MTEXT'){
+      let s=''; for(const [c,v] of g){ if(c===3||c===1) s+=v; }
+      if(t==='MTEXT') s=s.replace(/\\P/g,' ').replace(/\\[A-Za-z][^;\\]*;/g,'').replace(/\\[A-Za-z]/g,'').replace(/[{}]/g,'');
+      const tx=(t==='TEXT' && (+gv(g,72,0)||+gv(g,73,0))) ? [+gv(g,11),+gv(g,21)] : [+gv(g,10),+gv(g,20)];
+      const w=tf(mm2,tx[0],tx[1],0); const sc=Math.hypot(m.a,m.b);
+      LY(ln).texts.push({x:w[0],y:w[1],h:+gv(g,40,1)*sc,s:s.trim(),a:(+gv(g,50,0))*Math.PI/180+Math.atan2(m.b,m.a),mt:t==='MTEXT',ap:+gv(g,71,1)});
+    }
+    else if((t==='INSERT'||t==='DIMENSION') && depth<6){
+      const b=blocks[gv(g,2)]; if(!b) return;
+      let L2;
+      if(t==='DIMENSION'){ L2={...ID}; }
+      else{
+        const ix=+gv(g,10,0),iy=+gv(g,20,0),iz=+gv(g,30,0),sx=+gv(g,41,1),sy=+gv(g,42,1),sz=+gv(g,43,1),r=+gv(g,50,0)*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
+        // T(ins)·R·S·T(-base)
+        L2={a:c*sx,b:s*sx,c:-s*sy,d:c*sy,e:0,f:0,sz:sz,z:iz-b.bz*sz};
+        L2.e=ix-(L2.a*b.bx+L2.c*b.by); L2.f=iy-(L2.b*b.bx+L2.d*b.by);
+        if(o) L2=comp(o,L2);
+      }
+      const M=comp(m,L2);
+      for(const ce of b.ents) geom(ce,M,ln,depth+1);
+      if(t==='INSERT'){ const w=tf(m, o?-(+gv(g,10,0)):+gv(g,10,0), +gv(g,20,0), +gv(g,30,0)); const ly=LY(ln); ly.verts.push(w[0],w[1],w[2]); (ly.marks=ly.marks||[]).push(w[0],w[1]); }
+    }
+  }
+  function tessPoly(ly,m,pts,closed){
+    if(pts.length<1) return;
+    const out=[]; const n=pts.length;
+    for(let k=0;k<n;k++){ const p=pts[k]; out.push([p[0],p[1],p[2]]); const q = k+1<n ? pts[k+1] : (closed?pts[0]:null); if(q && p[3]) bulge(p,q,p[3],out); }
+    if(closed && pts[n-1][3]){ /* arc de fermeture déjà ajouté */ }
+    const last = closed ? (pts[n-1][3]? out.concat([[pts[0][0],pts[0][1],pts[0][2]]]) : out) : out;
+    addPoly(ly,m,last,closed && !pts[n-1][3],pts.map(p=>[p[0],p[1],p[2]]));
+  }
+  for(const e of top) geom(e,ID,null,0);
+  // origine locale + emprise
+  let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+  for(const ly of Object.values(layers)){ const s=ly.segs; for(let k=0;k<s.length;k+=3){ if(!isFinite(s[k])) continue; if(s[k]<minx)minx=s[k]; if(s[k]>maxx)maxx=s[k]; if(s[k+1]<miny)miny=s[k+1]; if(s[k+1]>maxy)maxy=s[k+1]; } const v=ly.verts; for(let k=0;k<v.length;k+=3){ if(v[k]<minx)minx=v[k]; if(v[k]>maxx)maxx=v[k]; if(v[k+1]<miny)miny=v[k+1]; if(v[k+1]>maxy)maxy=v[k+1]; } }
+  if(!isFinite(minx)){ minx=miny=0; maxx=maxy=1; }
+  const ox=Math.round((minx+maxx)/2), oy=Math.round((miny+maxy)/2);
+  for(const ly of Object.values(layers)){
+    ly.segs=Float64Array.from(ly.segs); ly.verts=Float64Array.from(ly.verts);
+    for(let k=0;k<ly.segs.length;k+=3){ ly.segs[k]-=ox; ly.segs[k+1]-=oy; }
+    for(let k=0;k<ly.verts.length;k+=3){ ly.verts[k]-=ox; ly.verts[k+1]-=oy; }
+    for(const t of ly.texts){ t.x-=ox; t.y-=oy; }
+    ly.marks=Float64Array.from(ly.marks||[]); for(let k=0;k<ly.marks.length;k+=2){ ly.marks[k]-=ox; ly.marks[k+1]-=oy; }
+  }
+  return {name, layers, ox, oy, bbox:{minx:minx-ox,miny:miny-oy,maxx:maxx-ox,maxy:maxy-oy}};
+}
+function gv(g,code,def){ for(const [c,v] of g) if(c===code) return typeof v==='string'?v.trim():v; return def; }
+
+/* ============================================================
+   Lecture des points (P,N,E,Z,D par défaut ; P,E,N,Z,D détecté)
+   ============================================================ */
+function parsePoints(text,name){
+  const pts=[];
+  for(const raw of text.split(/\r\n|\r|\n/)){
+    const line=raw.trim(); if(!line||line.startsWith('#')||line.startsWith('//')) continue;
+    let f;
+    if((line.match(/,/g)||[]).length>=3) f=line.split(',');
+    else if((line.match(/;/g)||[]).length>=3) f=line.split(';');
+    else if(line.includes('\t')) f=line.split('\t');
+    else { const t=line.split(/\s+/); f=t.slice(0,4).concat([t.slice(4).join(' ')]); }
+    f=f.map(s=>s.trim());
+    const a=parseFloat(f[1]), b=parseFloat(f[2]);
+    if(!isFinite(a)||!isFinite(b)) continue;
+    const z = f[3]===''||f[3]==null ? null : parseFloat(f[3]);
+    const desc=(f.slice(4).join(' ')||'').trim();
+    const tok=desc.split(/\s+/);
+    pts.push({id:f[0], a, b, z:isFinite(z)?z:null, desc, code:(tok[0]||'').toUpperCase(), attr:tok.slice(1).join(' ')});
+  }
+  return {name, on:true, order:'PNEZD', pts};
+}
+
+/* ============================================================
+   Analyse
+   ============================================================ */
+let ALL=[];   // points à plat, enrichis
+function buildAll(){
+  const prev=new Map(ALL.map(p=>[p.uid,p]));
+  ALL=[]; let idx=0;
+  S.files.forEach((f,fi)=>{
+    if(!f.on) return;
+    const occ={};
+    f.pts.forEach((p,k)=>{
+      const uid=fi+':'+k+':'+p.id;
+      occ[p.id]=(occ[p.id]||0)+1;
+      const pkey=f.name+'|'+p.id+(occ[p.id]>1?'#'+occ[p.id]:'');
+      const old=prev.get(uid)||S.pstate[pkey]||{};
+      const e = f.order==='PNEZD'? p.b : p.a, n = f.order==='PNEZD'? p.a : p.b;
+      ALL.push({uid, pkey, fi, file:f.name, idx:idx++, id:p.id, E:e, N:n, Z:p.z, desc:p.desc, code:p.code, attr:p.attr,
+        x: S.dxf? e-S.dxf.ox : e, y: S.dxf? n-S.dxf.oy : n,
+        exMode:old.exMode??null, method:old.method??null, layer:old.layer??null, note:old.note??'',
+        axes:(old.axes||[]).slice(), rep:!!old.rep, role:old.role??null });
+    });
+  });
+}
+/* Mémoire de travail par plan (axes, choix par point, rapport) — navigateur de l'utilisateur seulement */
+function projKey(){ return S.dxf&&!S.example ? 'proj.'+S.dxf.name : null; }
+function loadProject(){
+  const k=projKey(); S.axes=[]; S.pstate={};
+  if(!k) return false;
+  const pj=load(k,null); if(!pj) return false;
+  S.axes=pj.axes||[]; S.pstate=pj.pstate||{}; if(pj.codeRole) S.codeRole=pj.codeRole; if(pj.dossier) S.dossier=pj.dossier;
+  return S.axes.length>0;
+}
+let persistT=0;
+function persist(){
+  const k=projKey(); if(!k) return;
+  clearTimeout(persistT);
+  persistT=setTimeout(()=>{
+    for(const p of ALL){
+      const st={}; if(p.exMode) st.exMode=p.exMode; if(p.method) st.method=p.method; if(p.layer) st.layer=p.layer; if(p.note) st.note=p.note; if(p.axes.length) st.axes=p.axes; if(p.rep) st.rep=1; if(p.role) st.role=p.role;
+      if(Object.keys(st).length) S.pstate[p.pkey]=st; else delete S.pstate[p.pkey];
+    }
+    store(k,{axes:S.axes,pstate:S.pstate,codeRole:S.codeRole,dossier:S.dossier});
+  },300);
+}
+function codesPresent(){ const m=new Map(); for(const p of ALL){ m.set(p.code,(m.get(p.code)||0)+1); } return [...m.entries()].sort((a,b)=>b[1]-a[1]); }
+function autoMap(){
+  if(!S.dxf) return;
+  const saved=load('codemap',{});
+  const names=Object.keys(S.dxf.layers);
+  for(const [code] of codesPresent()){
+    if(S.codeLayers[code]) { S.codeLayers[code]=S.codeLayers[code].filter(n=>S.dxf.layers[n]); if(S.codeLayers[code].length) continue; }
+    if(saved[code]){ const ok=saved[code].filter(n=>S.dxf.layers[n]); if(ok.length){ S.codeLayers[code]=ok; continue; } }
+    if(!code){ S.codeLayers[code]=[]; continue; }
+    const hits=names.filter(n=> layerKey(n)===code || n.toUpperCase()===code);
+    S.codeLayers[code]=hits.filter(n=>{ const ly=S.dxf.layers[n]; return ly.segs.length||ly.verts.length; });
+  }
+  const sm=load('codemethod',{}); for(const k in sm) if(S.codeMethod[k]==null) S.codeMethod[k]=sm[k];
+}
+function detectOrder(){
+  if(!S.dxf) return;
+  const b=S.dxf.bbox, pad=Math.max(50,(b.maxx-b.minx)*0.5);
+  for(const f of S.files){
+    if(f.orderFixed) continue;
+    const inside=(e,n)=>{const x=e-S.dxf.ox,y=n-S.dxf.oy;return x>b.minx-pad&&x<b.maxx+pad&&y>b.miny-pad&&y<b.maxy+pad};
+    let c1=0,c2=0; for(const p of f.pts){ if(inside(p.b,p.a)) c1++; if(inside(p.a,p.b)) c2++; }
+    f.order = c2>c1 ? 'PENZD':'PNEZD'; f.inside=Math.max(c1,c2);
+  }
+}
+function layersFor(p){
+  if(p.layer) return [p.layer];
+  return S.codeLayers[p.code]||[];
+}
+function methodFor(p){ return p.method || S.codeMethod[p.code] || 'auto'; }
+function nearest(p,lays){
+  let bv=Infinity, vx=0,vy=0,vz=0,vl=null;
+  let bs=Infinity, sx=0,sy=0,sz=0,sl=null,sOff=0,sa=null;
+  for(const ln of lays){
+    const ly=S.dxf.layers[ln]; if(!ly) continue;
+    const V=ly.verts;
+    for(let k=0;k<V.length;k+=3){ const d=(V[k]-p.x)**2+(V[k+1]-p.y)**2; if(d<bv){bv=d;vx=V[k];vy=V[k+1];vz=V[k+2];vl=ln;} }
+    const G=ly.segs;
+    for(let k=0;k<G.length;k+=6){
+      const ax=G[k],ay=G[k+1],bx=G[k+3],by=G[k+4], dx=bx-ax, dy=by-ay, l2=dx*dx+dy*dy;
+      let t= l2>0 ? ((p.x-ax)*dx+(p.y-ay)*dy)/l2 : 0; t=t<0?0:t>1?1:t;
+      const fx=ax+t*dx, fy=ay+t*dy, d=(fx-p.x)**2+(fy-p.y)**2;
+      if(d<bs){ bs=d; sx=fx; sy=fy; sz=G[k+2]+t*(G[k+5]-G[k+2]); sl=ln; const len=Math.sqrt(l2)||1; sOff=-((dx*(p.y-ay)-dy*(p.x-ax))/len); sa=[ax,ay,bx,by]; }
+    }
+  }
+  return {v: vl? {x:vx,y:vy,z:vz,d:Math.sqrt(bv),layer:vl}:null, s: sl? {x:sx,y:sy,z:sz,d:Math.sqrt(bs),layer:sl,ec:sOff,seg:sa}:null};
+}
+/* ============================================================
+   Axes du plan
+   ============================================================ */
+const natCmp=(a,b)=>String(a).localeCompare(String(b),'fr',{numeric:true,sensitivity:'base'});
+function axGeom(a){
+  const ox=S.dxf?S.dxf.ox:0, oy=S.dxf?S.dxf.oy:0;
+  const x1=a.x1-ox, y1=a.y1-oy, x2=a.x2-ox, y2=a.y2-oy, len=Math.hypot(x2-x1,y2-y1)||1;
+  const ux=(x2-x1)/len, uy=(y2-y1)/len;
+  return {x1,y1,x2,y2,len,ux,uy,nx:uy,ny:-ux};
+}
+function axisById(id){ return S.axes.find(a=>a.id===id); }
+function gisement(a){ const g=axGeom(a); let az=Math.atan2(g.ux,g.uy)*180/Math.PI; if(az<0) az+=360; const d=Math.floor(az), mf=(az-d)*60, m=Math.floor(mf), s=Math.round((mf-m)*60); return `${d}°${String(m).padStart(2,'0')}′${String(s===60?59:s).padStart(2,'0')}″`; }
+function axDist(p,a){ const g=axGeom(a); const dx=p.x-g.x1, dy=p.y-g.y1; return {ec:dx*g.nx+dy*g.ny, pm:dx*g.ux+dy*g.uy, len:g.len}; }
+function nearAxes(p,max){
+  // axes à proximité, triés ; projection dans l'étendue de l'axe ± 5 m
+  return S.axes.map(a=>{ const d=axDist(p,a); return {a, d:Math.abs(d.ec), inside:d.pm>-5&&d.pm<d.len+5}; }).filter(o=>o.inside && (max==null||o.d<=max)).sort((x,y)=>x.d-y.d);
+}
+function autoAxes(p,max){
+  // l'axe le plus proche dans chaque famille de directions
+  const fam=new Map();
+  for(const o of nearAxes(p,max)){ const g=axGeom(o.a); const k=Math.round(((Math.atan2(g.uy,g.ux)*180/Math.PI)+360)%180/5)%36; if(!fam.has(k)) fam.set(k,o); }
+  return [...fam.values()].sort((x,y)=>x.d-y.d).slice(0,2).map(o=>o.a.id);
+}
+function normDir(x1,y1,x2,y2){ // sens normalisé : vers l'est (ou le nord si nord-sud)
+  return (x2-x1 < -1e-9 || (Math.abs(x2-x1)<=1e-9 && y2<y1)) ? [x2,y2,x1,y1] : [x1,y1,x2,y2];
+}
+function collinearExtent(lyNames, sx, sy, ux, uy){
+  let tmin=Infinity,tmax=-Infinity;
+  for(const ln of lyNames){ const G=S.dxf.layers[ln].segs;
+    for(let k=0;k<G.length;k+=6){
+      const ax=G[k]-sx, ay=G[k+1]-sy, bx=G[k+3]-sx, by=G[k+4]-sy;
+      const pa=Math.abs(ax*uy-ay*ux), pb=Math.abs(bx*uy-by*ux);
+      if(pa<0.005 && pb<0.005){ const ta=ax*ux+ay*uy, tb=bx*ux+by*uy; tmin=Math.min(tmin,ta,tb); tmax=Math.max(tmax,ta,tb); }
+    } }
+  return [tmin,tmax];
+}
+function makeAxis(name, lyNames, seg){ // seg=[ax,ay,bx,by] local
+  const len=Math.hypot(seg[2]-seg[0],seg[3]-seg[1]); const ux=(seg[2]-seg[0])/len, uy=(seg[3]-seg[1])/len;
+  const [t0,t1]=collinearExtent(lyNames, seg[0], seg[1], ux, uy);
+  const a0=isFinite(t0)?t0:0, a1=isFinite(t1)?t1:len;
+  const [x1,y1,x2,y2]=normDir(seg[0]+ux*a0, seg[1]+uy*a0, seg[0]+ux*a1, seg[1]+uy*a1);
+  return {id:'a'+Math.random().toString(36).slice(2,8), name, x1:x1+S.dxf.ox, y1:y1+S.dxf.oy, x2:x2+S.dxf.ox, y2:y2+S.dxf.oy};
+}
+function sameLine(a,b){ const g=axGeom(a), h=axGeom(b); if(Math.abs(g.ux*h.uy-g.uy*h.ux)>0.002) return false; return Math.abs((h.x1-g.x1)*g.nx+(h.y1-g.y1)*g.ny)<0.01; }
+function axisLayers(){ return S.dxf? Object.keys(S.dxf.layers).filter(n=>/AXE|AXIS|GRID|GRILLE|QUADR/i.test(n) && S.dxf.layers[n].segs.length) : []; }
+function detectAxes(){
+  if(!S.dxf) return 0;
+  const lays=axisLayers(); const found=[];
+  for(const ln of lays){
+    const ly=S.dxf.layers[ln], M=ly.marks||[], G=ly.segs;
+    for(const t of ly.texts){
+      const nm=(t.s||'').trim(); if(!nm || nm.length>6 || !/^[A-Za-z0-9][A-Za-z0-9.\-'’]*$/.test(nm)) continue;
+      // centre de bulle le plus proche (bloc ou cercle), sinon position du texte
+      let cx=t.x, cy=t.y, bd=1.0, isMark=false;
+      for(let k=0;k<M.length;k+=2){ const d=Math.hypot(M[k]-t.x,M[k+1]-t.y); if(d<bd){bd=d;cx=M[k];cy=M[k+1];isMark=true;} }
+      let best=null, bp=isMark?0.02:0.3;
+      for(let k=0;k<G.length;k+=6){
+        const ax=G[k],ay=G[k+1],bx=G[k+3],by=G[k+4], l=Math.hypot(bx-ax,by-ay); if(l<1) continue;
+        const de=Math.min(Math.hypot(ax-cx,ay-cy),Math.hypot(bx-cx,by-cy)); if(de>1.5) continue;
+        const perp=Math.abs((bx-ax)*(cy-ay)-(by-ay)*(cx-ax))/l;
+        if(perp<bp){ bp=perp; best=[ax,ay,bx,by]; }
+      }
+      if(!best) continue;
+      const ax=makeAxis(nm,[ln],best);
+      const dup=found.find(f=>f.name===nm && sameLine(f,ax));
+      if(dup){ continue; }
+      if(found.some(f=>sameLine(f,ax))) continue; // même ligne, autre étiquette : on garde la première
+      if(found.some(f=>f.name===nm)) ax.name=nm+"'";
+      found.push(ax);
+    }
+  }
+  found.sort((a,b)=>natCmp(a.name,b.name));
+  // conserver les axes saisis à la main qui ne recoupent pas la détection
+  const manual=S.axes.filter(a=>a.manual && !found.some(f=>sameLine(f,a)));
+  S.axes=[...found,...manual];
+  return found.length;
+}
+function pickSegment(sx,sy){
+  if(!S.dxf) return null; let best=null, bd=10;
+  for(const ly of Object.values(S.dxf.layers)){
+    if(S.layerOn[ly.name]===false) continue; const G=ly.segs;
+    for(let k=0;k<G.length;k+=6){
+      const a=toS(G[k],G[k+1]), b=toS(G[k+3],G[k+4]); const dx=b[0]-a[0], dy=b[1]-a[1], l2=dx*dx+dy*dy; if(l2<1) continue;
+      let t=((sx-a[0])*dx+(sy-a[1])*dy)/l2; t=t<0?0:t>1?1:t; const d=Math.hypot(a[0]+t*dx-sx,a[1]+t*dy-sy);
+      if(d<bd){ bd=d; best={layer:ly.name, seg:[G[k],G[k+1],G[k+3],G[k+4]]}; }
+    } }
+  return best;
+}
+
+function alongPoint(p){
+  // point théorique sur la ligne de référence : sommet du plan sur cette ligne, ou intersection avec un axe ou une autre ligne du même code
+  const sg=p.res.seg, ax=sg[0], ay=sg[1], l=Math.hypot(sg[2]-ax,sg[3]-ay)||1, ux=(sg[2]-ax)/l, uy=(sg[3]-ay)/l;
+  const lim=Math.max(S.snap*3,0.3); let best=null, bd=lim;
+  const consider=(x,y)=>{ const d=Math.hypot(x-p.x,y-p.y); if(d<bd){ bd=d; best=[x,y]; } };
+  const inter=(bx,by,vx,vy)=>{ const den=ux*vy-uy*vx; if(Math.abs(den)<0.0175) return null; const t=((bx-ax)*vy-(by-ay)*vx)/den; return [ax+ux*t, ay+uy*t, t]; };
+  for(const a of S.axes){ const g=axGeom(a); const q=inter(g.x1,g.y1,g.ux,g.uy); if(q) consider(q[0],q[1]); }
+  for(const ln of layersFor(p)){ const ly=S.dxf.layers[ln]; if(!ly) continue;
+    const V=ly.verts; for(let k=0;k<V.length;k+=3){ const dx=V[k]-ax, dy=V[k+1]-ay; if(Math.abs(dx*uy-dy*ux)<0.002) consider(V[k],V[k+1]); }
+    const G=ly.segs; for(let k=0;k<G.length;k+=6){ const sl=Math.hypot(G[k+3]-G[k],G[k+4]-G[k+1]); if(sl<1e-6) continue; const vx=(G[k+3]-G[k])/sl, vy=(G[k+4]-G[k+1])/sl; const q=inter(G[k],G[k+1],vx,vy); if(!q) continue; const s=(q[0]-G[k])*vx+(q[1]-G[k+1])*vy; if(s<-0.001||s>sl+0.001) continue; consider(q[0],q[1]); }
+  }
+  return best;
+}
+const ROLE_LBL={imp:'Implantation',station:'Station',ref:'Référence / cible',verif:'Vérification (fermeture)'};
+function autoRole(p){
+  const c=p.code;
+  if(/^(CIBLE|CIBLES|TARGET|REF|REPERE|REPÈRE|BM|RN|PG|PGEO)/.test(c)) return 'ref';
+  if(/^FERME/.test(c)) return 'verif';
+  if(!c || /^(ST|STN|STATION)$/.test(c)) return 'station';
+  return 'imp';
+}
+function roleOf(p){ return p.role || S.codeRole[p.code] || autoRole(p); }
+function analyse(){
+  // 1) doublons : même code, < S.dup en plan, et |ΔZ| < 0,15 m si Z connus
+  for(const p of ALL){ p.dupGroup=null; p.autoEx=null; }
+  const cand=ALL.filter(p=>p.code && roleOf(p)==='imp' && layersFor(p).length && (S.codeMethod[p.code]||'auto')!=='ignore');
+  const cell=Math.max(S.dup,0.001), grid=new Map();
+  const key=(i,j)=>i+','+j;
+  cand.forEach(p=>{ const k=key(Math.floor(p.x/cell),Math.floor(p.y/cell)); (grid.get(k)||grid.set(k,[]).get(k)).push(p); });
+  const parent=new Map(cand.map(p=>[p.uid,p.uid]));
+  const find=u=>{ while(parent.get(u)!==u){ parent.set(u,parent.get(parent.get(u))); u=parent.get(u);} return u; };
+  for(const p of cand){
+    const i=Math.floor(p.x/cell), j=Math.floor(p.y/cell);
+    for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++){
+      for(const q of grid.get(key(i+di,j+dj))||[]){
+        if(q.idx<=p.idx||q.code!==p.code) continue;
+        if(Math.hypot(q.x-p.x,q.y-p.y)>S.dup) continue;
+        if(p.Z!=null&&q.Z!=null&&Math.abs(p.Z-q.Z)>0.15) continue;
+        parent.set(find(q.uid),find(p.uid));
+      }
+    }
+  }
+  const groups=new Map();
+  for(const p of cand){ const r=find(p.uid); (groups.get(r)||groups.set(r,[]).get(r)).push(p); }
+  for(const g of groups.values()){
+    if(g.length<2) continue;
+    g.sort((a,b)=>a.idx-b.idx);
+    const gk=g.map(p=>p.uid).join('|');
+    const keepUid = S.dupKeep[gk] && g.some(p=>p.uid===S.dupKeep[gk]) ? S.dupKeep[gk] : g[g.length-1].uid;
+    const keeper=g.find(p=>p.uid===keepUid);
+    for(const p of g){ p.dupGroup=gk; p.dupMembers=g; if(p.uid!==keepUid) p.autoEx='Doublon de '+keeper.id+' (gardé)'; }
+  }
+  // 2) écarts
+  const is3D=S.mode==='3D';
+  for(const p of ALL){
+    p.res=null; p.status='nc'; p.ex = p.exMode==='out' || (p.exMode==null && !!p.autoEx);
+    p.roleEff=roleOf(p); if(p.roleEff!=='imp'){ p.status='st'; p.ex=false; continue; }
+    const meth=methodFor(p);
+    const lays=layersFor(p);
+    if(!S.dxf || !lays.length || meth==='ignore'){ p.status = p.ex?'ex':'nc'; continue; }
+    const nr=nearest(p,lays);
+    let kind = meth;
+    if(kind==='auto'){
+      // point posé sur une ligne (EC ≤ tolérance) mais loin d'un sommet : implantation le long de la ligne
+      const onLine = nr.s && nr.s.d<=S.tol && nr.v && nr.v.d>2*S.tol;
+      kind = (nr.v && nr.v.d<=S.snap && !onLine) ? 'vertex' : 'line';
+    }
+    if(kind==='vertex' && !nr.v) kind='line';
+    if(kind==='line' && !nr.s) kind='vertex';
+    let r;
+    if(kind==='vertex'){ const v=nr.v; r={kind, layer:v.layer, tx:v.x, ty:v.y, tz:v.z, dE:p.x-v.x, dN:p.y-v.y, d:v.d, ec:null}; }
+    else { const s=nr.s; r={kind, layer:s.layer, tx:s.x, ty:s.y, tz:s.z, dE:p.x-s.x, dN:p.y-s.y, d:s.d, ec:s.ec, seg:s.seg}; }
+    // Z théorique : DXF si le calque est 3D, sinon Z de conception saisi pour le code
+    r.zth=null; r.zsrc=null;
+    const ly=S.dxf.layers[r.layer];
+    if(ly && ly.has3D){ r.zth=r.tz; r.zsrc='DXF'; }
+    else if(S.codeZ[p.code]!=null && S.codeZ[p.code]!==''){ r.zth=+S.codeZ[p.code]; r.zsrc='Conception'; }
+    r.dZ = (is3D && r.zth!=null && p.Z!=null) ? p.Z-r.zth : null;
+    p.res=r;
+    if(p.ex){ p.status='ex'; continue; }
+    if(r.d>S.doubt) p.status='doubt';
+    else if(r.d>S.tol+1e-9 || (r.dZ!=null && Math.abs(r.dZ)>S.tolZ+1e-9)) p.status='out';
+    else p.status='ok';
+  }
+  // 3) écarts par rapport aux axes associés (PM / EC, EC + à droite dans le sens de l'axe)
+  for(const p of ALL){
+    p.axes=p.axes.filter(id=>axisById(id));
+    p.thPt=null;
+    if(p.status==='st'){ p.axRes=[]; continue; }
+    p.axRes=p.axes.map(id=>{
+      const a=axisById(id), g=axGeom(a);
+      const om=(p.x-g.x1)*g.nx+(p.y-g.y1)*g.ny, pm=(p.x-g.x1)*g.ux+(p.y-g.y1)*g.uy;
+      let ot=null;
+      if(p.res){
+        let T=[p.res.tx,p.res.ty];
+        if(p.res.kind==='line'){
+          const sg=p.res.seg, l=Math.hypot(sg[2]-sg[0],sg[3]-sg[1])||1, lx=(sg[2]-sg[0])/l, ly=(sg[3]-sg[1])/l;
+          // axe sécant à la ligne de référence : le point théorique est un point défini sur la ligne (intersection, sommet)
+          if(Math.abs(lx*g.uy-ly*g.ux)>0.0175){ if(p.thPt===null) p.thPt=alongPoint(p)||false; T=p.thPt||null; }
+        }
+        if(T) ot=(T[0]-g.x1)*g.nx+(T[1]-g.y1)*g.ny;
+      }
+      const d = ot==null? null : om-ot;
+      const st = p.ex ? 'ex' : d==null ? 'nc' : Math.abs(d)>S.doubt ? 'doubt' : Math.abs(d)>S.tol+1e-9 ? 'out' : 'ok';
+      return {id, name:a.name, pm, om, ot, d, st};
+    });
+    // un point lié à des axes prend le statut de ses écarts aux axes (le plus défavorable), plus le ΔZ en 3D
+    const sts=p.axRes.map(a=>a.st).filter(s=>s==='ok'||s==='out'||s==='doubt');
+    if(sts.length && !p.ex){
+      const zOut = p.res && p.res.dZ!=null && Math.abs(p.res.dZ)>S.tolZ+1e-9;
+      p.status = sts.includes('doubt') ? 'doubt' : (sts.includes('out')||zOut) ? 'out' : 'ok';
+    }
+  }
+}
+
+/* ============================================================
+   Vue en plan (canvas)
+   ============================================================ */
+const cv=$('#plan'), ctx=cv.getContext('2d'), wrap=$('#planwrap');
+const V={cx:0,cy:0,s:1,W:0,H:0,dpr:1};
+let C={}; function readColors(){ const cs=getComputedStyle(document.documentElement); for(const k of ['plan-bg','plan-line','plan-line-strong','plan-text','ok','out','doubt','ex','nc','sel','ink','ink-2','surface','accent']) C[k]=cs.getPropertyValue('--'+k).trim(); }
+function resize(){ const r=wrap.getBoundingClientRect(); V.dpr=window.devicePixelRatio||1; V.W=r.width; V.H=r.height; cv.width=Math.round(r.width*V.dpr); cv.height=Math.round(r.height*V.dpr); draw(); }
+const toS=(x,y)=>[(x-V.cx)*V.s+V.W/2, V.H/2-(y-V.cy)*V.s];
+const toW=(sx,sy)=>[(sx-V.W/2)/V.s+V.cx, V.cy-(sy-V.H/2)/V.s];
+function fit(onlyPts){
+  let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+  const use = ALL.filter(p=>p.status!=='nc'||!S.dxf);
+  const src = (onlyPts!==false && use.length) ? use : null;
+  if(src){ for(const p of src){ minx=Math.min(minx,p.x);maxx=Math.max(maxx,p.x);miny=Math.min(miny,p.y);maxy=Math.max(maxy,p.y);} }
+  else if(S.dxf){ const b=S.dxf.bbox; minx=b.minx;miny=b.miny;maxx=b.maxx;maxy=b.maxy; }
+  else if(ALL.length){ for(const p of ALL){ minx=Math.min(minx,p.x);maxx=Math.max(maxx,p.x);miny=Math.min(miny,p.y);maxy=Math.max(maxy,p.y);} }
+  if(!isFinite(minx)) return;
+  const w=Math.max(maxx-minx,2), h=Math.max(maxy-miny,2);
+  V.cx=(minx+maxx)/2; V.cy=(miny+maxy)/2; V.s=Math.min((V.W-40)/w,(V.H-90)/h); if(!(V.s>0)) V.s=1;
+  draw();
+}
+function zoomTo(p){ V.cx=p.x; V.cy=p.y; V.s=Math.max(V.s,180); draw(); }
+const statusColor = st => ({ok:C.ok,out:C.out,doubt:C.doubt,ex:C.ex,nc:C.nc,st:C['ink-2']})[st]||C.nc;
+let raf=0; function draw(){ if(raf) return; raf=requestAnimationFrame(()=>{raf=0;render();}); }
+function render(){
+  readColors();
+  const d=V.dpr; ctx.setTransform(d,0,0,d,0,0);
+  ctx.fillStyle=C['plan-bg']; ctx.fillRect(0,0,V.W,V.H);
+  if(S.dxf){
+    const used=new Set(); for(const c in S.codeLayers) for(const n of S.codeLayers[c]) used.add(n); for(const p of ALL) if(p.layer) used.add(p.layer);
+    for(const ly of Object.values(S.dxf.layers)){
+      if(S.layerOn[ly.name]===false) continue;
+      const strong=used.has(ly.name);
+      ctx.strokeStyle= strong? C['plan-line-strong'] : C['plan-line']; ctx.lineWidth= strong?1.1:0.8;
+      ctx.beginPath(); const G=ly.segs;
+      for(let k=0;k<G.length;k+=6){ const a=toS(G[k],G[k+1]), b=toS(G[k+3],G[k+4]); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+      ctx.stroke();
+      if(ly.texts.length){
+        ctx.fillStyle=C['plan-text'];
+        for(const t of ly.texts){ const px=t.h*V.s; if(px<7||px>120||!t.s) continue; const [sx,sy]=toS(t.x,t.y); if(sx<-200||sy<-50||sx>V.W+200||sy>V.H+50) continue;
+          ctx.save(); ctx.translate(sx,sy); ctx.rotate(-t.a); ctx.font=`${px}px ${getComputedStyle(document.body).fontFamily}`; ctx.textBaseline= t.mt? 'top':'alphabetic'; ctx.fillText(t.s.slice(0,40),0,0); ctx.restore(); }
+      }
+    }
+  }
+  // axes
+  if(S.axes.length && S.showAxes!==false){
+    const ff=getComputedStyle(document.body).fontFamily;
+    for(const a of S.axes){
+      const g=axGeom(a); const on=S.axisSel===a.id;
+      const p1=toS(g.x1,g.y1), p2=toS(g.x2,g.y2);
+      ctx.strokeStyle=C.accent; ctx.globalAlpha=on?1:0.75; ctx.lineWidth=on?2.2:1.1; ctx.setLineDash(on?[]:[10,4,2,4]);
+      ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]); ctx.stroke(); ctx.setLineDash([]);
+      for(const [q,sgn] of [[p1,-1],[p2,1]]){
+        const bx=q[0]+sgn*g.ux*13, by=q[1]-sgn*g.uy*13;
+        ctx.beginPath(); ctx.arc(bx,by,11,0,Math.PI*2); ctx.fillStyle=on?C.accent:C['plan-bg']; ctx.fill(); ctx.lineWidth=1.3; ctx.stroke();
+        ctx.fillStyle=on?C.surface:C.accent; ctx.font=`600 ${a.name.length>3?9:11}px ${ff}`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(a.name,bx,by+0.5);
+      }
+      ctx.globalAlpha=1; ctx.textAlign='start';
+    }
+  }
+  // points
+  const R=Math.max(3,Math.min(6,V.s*0.02+3));
+  if(S.sel.size===1){ const p=ALL.find(q=>S.sel.has(q.uid)); if(p) for(const ar of p.axRes||[]){ const a=axisById(ar.id); if(!a) continue; const g=axGeom(a); const fx=p.x-ar.om*g.nx, fy=p.y-ar.om*g.ny; const s1=toS(p.x,p.y), s2=toS(fx,fy); ctx.strokeStyle=C.sel; ctx.lineWidth=1.5; ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(s1[0],s1[1]); ctx.lineTo(s2[0],s2[1]); ctx.stroke(); ctx.setLineDash([]); } }
+  const sel=S.sel;
+  // vecteurs / référence
+  for(const p of ALL){
+    if(!p.res) continue;
+    const isSel=sel.has(p.uid);
+    if(!(S.vec||isSel)) continue;
+    const r=p.res; const [tx,ty]=toS(r.tx,r.ty);
+    if(isSel){
+      ctx.strokeStyle=C.sel; ctx.lineWidth=2;
+      if(r.seg){ const a=toS(r.seg[0],r.seg[1]), b=toS(r.seg[2],r.seg[3]); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(tx-6,ty); ctx.lineTo(tx+6,ty); ctx.moveTo(tx,ty-6); ctx.lineTo(tx,ty+6); ctx.stroke();
+    }
+    const k=S.vec?100:1; const [ex,ey]=toS(r.tx+r.dE*k, r.ty+r.dN*k);
+    ctx.strokeStyle= isSel? C.sel : statusColor(p.status); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(ex,ey); ctx.stroke();
+    if(S.vec){ const ang=Math.atan2(ey-ty,ex-tx); ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ex-6*Math.cos(ang-0.4),ey-6*Math.sin(ang-0.4)); ctx.lineTo(ex-6*Math.cos(ang+0.4),ey-6*Math.sin(ang+0.4)); ctx.closePath(); ctx.fillStyle=ctx.strokeStyle; ctx.fill(); }
+  }
+  const order={nc:0,ex:1,ok:2,out:3,doubt:4,st:5};
+  const list=[...ALL].sort((a,b)=>order[a.status]-order[b.status]);
+  const showLbl = S.labels && V.s>45;
+  ctx.font=`500 11px ${getComputedStyle(document.body).fontFamily}`; ctx.textBaseline='middle';
+  for(const p of list){
+    const [x,y]=toS(p.x,p.y); if(x<-10||y<-10||x>V.W+10||y>V.H+10) continue;
+    const col=statusColor(p.status);
+    if(p.status==='st'){
+      const k=R+2; ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=1.6; ctx.beginPath();
+      if(p.roleEff==='station'){ ctx.moveTo(x,y-k-1); ctx.lineTo(x+k,y+k*0.8); ctx.lineTo(x-k,y+k*0.8); ctx.closePath(); ctx.fill(); }
+      else if(p.roleEff==='ref'){ ctx.arc(x,y,k,0,Math.PI*2); ctx.moveTo(x-k-3,y); ctx.lineTo(x+k+3,y); ctx.moveTo(x,y-k-3); ctx.lineTo(x,y+k+3); ctx.stroke(); }
+      else { ctx.moveTo(x,y-k); ctx.lineTo(x+k,y); ctx.lineTo(x,y+k); ctx.lineTo(x-k,y); ctx.closePath(); ctx.stroke(); }
+    } else {
+    ctx.beginPath(); ctx.arc(x,y, p.status==='nc'?R*0.7:R, 0, Math.PI*2);
+    if(p.status==='ex'){ ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.stroke(); }
+    else { ctx.fillStyle=col; ctx.fill(); ctx.strokeStyle=C['plan-bg']; ctx.lineWidth=1; ctx.stroke(); }
+    }
+    if(p.dupGroup && p.status!=='nc'){ ctx.setLineDash([2,2]); ctx.strokeStyle=C.doubt; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(x,y,R+3,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); }
+    if(sel.has(p.uid)){ ctx.strokeStyle=C.sel; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(x,y,R+5,0,Math.PI*2); ctx.stroke(); }
+    if(showLbl && (p.status!=='nc' || V.s>120)){ ctx.fillStyle=C['ink-2']; ctx.fillText(p.id, x+R+3, y-R-2); }
+  }
+  if(box){ ctx.strokeStyle=C.sel; ctx.setLineDash([5,4]); ctx.lineWidth=1.5; ctx.strokeRect(Math.min(box.x0,box.x1),Math.min(box.y0,box.y1),Math.abs(box.x1-box.x0),Math.abs(box.y1-box.y0)); ctx.setLineDash([]); }
+  // échelle
+  const target=110/V.s; const p10=Math.pow(10,Math.floor(Math.log10(target))); let unit=p10; for(const m of [1,2,5,10]) if(m*p10<=target) unit=m*p10;
+  const lbl = unit>=1? unit+' m' : (unit*1000)+' mm';
+  $('#scalebar').innerHTML=`<div style="width:${unit*V.s}px"></div>${lbl}`;
+}
+// interactions
+const ptrs=new Map(); let drag=null, box=null, pinch=null;
+cv.addEventListener('pointerdown',e=>{
+  cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.offsetX,y:e.offsetY});
+  if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y), s:V.s, w:toW((a.x+b.x)/2,(a.y+b.y)/2)}; drag=null; box=null; return; }
+  if(e.shiftKey||S.boxMode){ box={x0:e.offsetX,y0:e.offsetY,x1:e.offsetX,y1:e.offsetY,add:e.ctrlKey||e.metaKey}; return; }
+  drag={x:e.offsetX,y:e.offsetY,cx:V.cx,cy:V.cy,moved:false};
+});
+cv.addEventListener('pointermove',e=>{
+  const [wx,wy]=toW(e.offsetX,e.offsetY);
+  if(S.dxf||ALL.length){ const ox=S.dxf?S.dxf.ox:0, oy=S.dxf?S.dxf.oy:0; $('#coords').textContent=`E ${(wx+ox).toFixed(3)}  N ${(wy+oy).toFixed(3)}`; }
+  if(!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId,{x:e.offsetX,y:e.offsetY});
+  if(pinch && ptrs.size===2){ const [a,b]=[...ptrs.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); V.s=pinch.s*d/pinch.d; const mx=(a.x+b.x)/2,my=(a.y+b.y)/2; V.cx=pinch.w[0]-(mx-V.W/2)/V.s; V.cy=pinch.w[1]+(my-V.H/2)/V.s; draw(); return; }
+  if(box){ box.x1=e.offsetX; box.y1=e.offsetY; draw(); return; }
+  if(drag){ const dx=e.offsetX-drag.x, dy=e.offsetY-drag.y; if(Math.abs(dx)+Math.abs(dy)>3) drag.moved=true; V.cx=drag.cx-dx/V.s; V.cy=drag.cy+dy/V.s; draw(); }
+});
+function endPtr(e){
+  ptrs.delete(e.pointerId);
+  if(pinch){ if(ptrs.size<2) pinch=null; return; }
+  if(box){
+    const x0=Math.min(box.x0,box.x1),x1=Math.max(box.x0,box.x1),y0=Math.min(box.y0,box.y1),y1=Math.max(box.y0,box.y1);
+    if(!box.add) S.sel.clear();
+    if(x1-x0>4||y1-y0>4){ for(const p of ALL){ const [x,y]=toS(p.x,p.y); if(x>=x0&&x<=x1&&y>=y0&&y<=y1) S.sel.add(p.uid); } }
+    box=null; refreshSel(); return;
+  }
+  if(drag && !drag.moved){
+    if(S.pickAxis){
+      const s=pickSegment(e.offsetX,e.offsetY);
+      if(s){ const a=makeAxis('?',[s.layer],s.seg); a.manual=true; if(S.axes.some(b=>sameLine(a,b))){ toast('Cette ligne est déjà un axe'); } else { S.axes.push(a); S.axisSel=a.id; S.pickAxis=false; persist(); renderAxes(true); draw(); toast('Axe ajouté : donnez-lui son nom'); } }
+      else toast('Aucune ligne sous le curseur');
+    } else pick(e.offsetX,e.offsetY,e.ctrlKey||e.metaKey);
+  }
+  drag=null;
+}
+cv.addEventListener('pointerup',endPtr); cv.addEventListener('pointercancel',endPtr);
+cv.addEventListener('wheel',e=>{ e.preventDefault(); const [wx,wy]=toW(e.offsetX,e.offsetY); const f=Math.exp(-e.deltaY*0.0015); V.s*=f; V.cx=wx-(e.offsetX-V.W/2)/V.s; V.cy=wy+(e.offsetY-V.H/2)/V.s; draw(); },{passive:false});
+function pick(sx,sy,add){
+  let best=null,bd=14;
+  for(const p of ALL){ const [x,y]=toS(p.x,p.y); const d=Math.hypot(x-sx,y-sy); if(d<bd){bd=d;best=p;} }
+  // clic sur un axe avec des points sélectionnés : lier / délier cet axe
+  if(!best && S.sel.size && S.axes.length){
+    let ba=null, bda=8; for(const a of S.axes){ const g=axGeom(a); const p1=toS(g.x1,g.y1), p2=toS(g.x2,g.y2); const dx=p2[0]-p1[0], dy=p2[1]-p1[1], l2=dx*dx+dy*dy||1; let t=((sx-p1[0])*dx+(sy-p1[1])*dy)/l2; t=t<0?0:t>1?1:t; const d=Math.hypot(p1[0]+t*dx-sx,p1[1]+t*dy-sy); if(d<bda){bda=d;ba=a;} }
+    if(ba){ const sel=ALL.filter(p=>S.sel.has(p.uid)); const has=sel.every(p=>p.axes.includes(ba.id)); for(const p of sel){ if(has) p.axes=p.axes.filter(i=>i!==ba.id); else if(!p.axes.includes(ba.id)) p.axes.push(ba.id); } toast((has?'Axe '+ba.name+' délié de ':'Axe '+ba.name+' lié à ')+(sel.length>1?sel.length+' points':sel[0].id)); recompute(); return; }
+  }
+  if(!add) S.sel.clear();
+  if(best){ if(add && S.sel.has(best.uid)) S.sel.delete(best.uid); else S.sel.add(best.uid); }
+  refreshSel();
+}
+
+/* ============================================================
+   Panneaux
+   ============================================================ */
+const STAT_LBL={ok:'Conforme',out:'Hors tolérance',doubt:'Douteux',ex:'Exclu',nc:'Non classé',st:'Station / réf.'};
+const METH_LBL={auto:'Auto',vertex:'Sommet',line:'Ligne (EC)',ignore:'Ignorer'};
+function pill(st){ return `<span class="pill ${st}">${STAT_LBL[st]}</span>`; }
+function recompute(){ analyse(); renderAll(); persist(); }
+function renderAll(){ renderFiles(); renderCodes(); renderPoints(); renderAxes(); renderReport(); renderLayers(); renderDetail(); draw(); }
+function refreshSel(){ renderDetail(); renderPoints(); renderAxes(); draw(); }
+
+function renderFiles(){
+  const h=[];
+  if(S.example) h.push(`<span class="banner">Exemple fictif chargé · ouvrez votre plan DXF et vos fichiers de points pour remplacer</span>`);
+  if(S.dxf){ const nl=Object.keys(S.dxf.layers).length; h.push(`<span class="chip">DXF <b title="${esc(S.dxf.name)}">${esc(S.dxf.name)}</b><span>${nl} calques</span><button class="x" data-rmdxf title="Retirer le plan">×</button></span>`); }
+  else h.push(`<span class="notice">Aucun plan DXF chargé</span>`);
+  S.files.forEach((f,i)=>{
+    h.push(`<span class="chip"><input type="checkbox" data-fon="${i}" ${f.on?'checked':''} aria-label="Inclure ${esc(f.name)}"><b title="${esc(f.name)}">${esc(f.name)}</b><span>${f.pts.length} pts</span>
+      <select data-ford="${i}" title="Ordre des colonnes" style="width:auto;padding:1px 3px;font-size:11.5px"><option value="PNEZD" ${f.order==='PNEZD'?'selected':''}>P,N,E,Z,D</option><option value="PENZD" ${f.order==='PENZD'?'selected':''}>P,E,N,Z,D</option></select>
+      <button class="x" data-rmf="${i}" title="Retirer ce fichier">×</button></span>`);
+  });
+  if(!S.files.length) h.push(`<span class="notice">Aucun fichier de points</span>`);
+  if(S.dossier&&S.dossier.version) h.push(`<span class="chip" title="${esc((S.dossier.historique||[]).slice(-5).map(x=>'v'+x.version+' · '+(x.date||'').slice(0,10)+' · '+(x.par||'')).join('\n'))}">Dossier <b>v${S.dossier.version}</b><span>${esc((S.dossier.date||'').slice(0,10))}${S.dossier.par?' · '+esc(S.dossier.par):''}</span>&nbsp;</span>`);
+  if(S.pendingDossier) h.push(`<span class="pill out">Dossier v${S.pendingDossier.version} en attente du plan ${esc(S.pendingDossier.plan||'')}</span>`);
+  if(S.dxf && S.files.length){ const out=S.files.filter(f=>f.on && f.inside!=null && f.inside < f.pts.length*0.5); if(out.length) h.push(`<span class="pill out">Peu de points dans l'emprise du DXF : vérifiez le système de coordonnées</span>`); }
+  $('#files').innerHTML=h.join('');
+}
+$('#files').addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.fon!=null){ S.files[+t.dataset.fon].on=t.checked; buildAll(); autoMap(); recompute(); }
+  if(t.dataset.ford!=null){ const f=S.files[+t.dataset.ford]; f.order=t.value; f.orderFixed=true; buildAll(); recompute(); fit(); }
+});
+$('#files').addEventListener('click',e=>{
+  const t=e.target.closest('button'); if(!t) return;
+  if(t.dataset.rmf!=null){ S.files.splice(+t.dataset.rmf,1); S.example=false; buildAll(); S.sel.clear(); recompute(); }
+  if(t.dataset.rmdxf!=null){ S.dxf=null; S.example=false; S.axes=[]; buildAll(); recompute(); }
+});
+
+function renderCodes(){
+  const codes=codesPresent();
+  $('#nCodes').textContent=codes.length||'';
+  const lnames=S.dxf? Object.keys(S.dxf.layers).filter(n=>{const l=S.dxf.layers[n];return l.segs.length||l.verts.length}).sort():[];
+  const is3D=S.mode==='3D';
+  let h=`<div class="sect"><h4>Règles d'analyse</h4>
+   <div class="rules">
+    <label>Tolérance en plan<span class="unit"><input type="number" id="rTol" step="1" min="0" value="${(S.tol*1000).toFixed(0)}"><span>mm</span></span></label>
+    <label ${is3D?'':'hidden'}>Tolérance en Z<span class="unit"><input type="number" id="rTolZ" step="1" min="0" value="${(S.tolZ*1000).toFixed(0)}"><span>mm</span></span></label>
+    <label>Rayon d'accroche sommet<span class="unit"><input type="number" id="rSnap" step="10" min="0" value="${(S.snap*1000).toFixed(0)}"><span>mm</span></span></label>
+    <label>Douteux au-delà de<span class="unit"><input type="number" id="rDoubt" step="10" min="0" value="${(S.doubt*1000).toFixed(0)}"><span>mm</span></span></label>
+    <label>Doublons à moins de<span class="unit"><input type="number" id="rDup" step="5" min="0" value="${(S.dup*1000).toFixed(0)}"><span>mm</span></span></label>
+   </div>
+   <p class="help" style="margin-top:8px">Méthode <b>Auto</b> : si un sommet du plan est dans le rayon d'accroche, l'écart est mesuré au sommet (coin) ; sinon, ou si le point est sur une ligne à plus de 2 × la tolérance d'un sommet, c'est l'écart perpendiculaire à la ligne (EC, + à droite). Forcez <b>Sommet</b> pour un code de coins.${is3D?' En 3D, le Z théorique vient du DXF si le calque a des élévations, sinon du Z de conception saisi pour le code.':''}</p></div>`;
+  h+=`<div class="sect"><h4>Codes du levé → calques du plan</h4><p class="help" style="margin-bottom:8px">Associé automatiquement par le nom de calque abrégé à 8 caractères (format Trimble). Ajoutez, retirez ou ignorez au besoin.</p><div style="display:flex;flex-direction:column;gap:8px">`;
+  for(const [code,n] of codes){
+    const lays=S.codeLayers[code]||[]; const meth=S.codeMethod[code]||'auto';
+    const off = !lays.length || meth==='ignore';
+    const opts=lnames.filter(l=>!lays.includes(l)).map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join('');
+    const any3D = lays.some(l=>S.dxf&&S.dxf.layers[l]&&S.dxf.layers[l].has3D);
+    h+=`<div class="code ${off?'off':''}">
+      <div class="hd"><span class="nm">${code?esc(code):'<i>(sans code)</i>'}</span><span class="ct">${n} pts</span>
+        <select data-cr="${esc(code)}" aria-label="Rôle des points ${esc(code)}" title="Rôle des points de ce code"><option value="">Rôle : auto (${ROLE_LBL[autoRole({code,desc:code,id:''})].split(' ')[0]})</option>${Object.entries(ROLE_LBL).map(([k,v])=>`<option value="${k}" ${S.codeRole[code]===k?'selected':''}>${v}</option>`).join('')}</select>
+        <select data-cm="${esc(code)}" aria-label="Méthode pour ${esc(code)}">${['auto','vertex','line','ignore'].map(m=>`<option value="${m}" ${m===meth?'selected':''}>${METH_LBL[m]}</option>`).join('')}</select></div>
+      <div class="lays">${lays.map(l=>`<span class="lay">${esc(l)}<button data-rml="${esc(code)}" data-l="${esc(l)}" title="Retirer">×</button></span>`).join('')||'<span class="ct">Non classé</span>'}
+        ${S.dxf?`<select data-addl="${esc(code)}" aria-label="Ajouter un calque à ${esc(code)}"><option value="">+ calque…</option>${opts}</select>`:''}</div>
+      ${is3D && lays.length && meth!=='ignore' ? `<div class="zrow">${any3D?'Z théorique : DXF':'Z de conception'} <input type="number" step="0.001" data-cz="${esc(code)}" value="${S.codeZ[code]??''}" placeholder="${any3D?'(du DXF)':'ex. 44.400'}" ${any3D?'disabled':''}> m</div>`:''}
+    </div>`;
+  }
+  if(!codes.length) h+=`<p class="help">Chargez un fichier de points pour voir ses codes.</p>`;
+  h+=`</div></div>`;
+  $('#pane-codes').innerHTML=h;
+}
+$('#pane-codes').addEventListener('change',e=>{
+  const t=e.target; const v=parseFloat(t.value);
+  const rule={rTol:'tol',rTolZ:'tolZ',rSnap:'snap',rDoubt:'doubt',rDup:'dup'}[t.id];
+  if(rule){ if(isFinite(v)&&v>=0){ S[rule]=v/1000; store('rules',{tol:S.tol,tolZ:S.tolZ,snap:S.snap,doubt:S.doubt,dup:S.dup}); recompute(); } return; }
+  if(t.dataset.cm!=null){ S.codeMethod[t.dataset.cm]=t.value; saveMaps(); recompute(); }
+  if(t.dataset.cr!=null){ if(t.value) S.codeRole[t.dataset.cr]=t.value; else delete S.codeRole[t.dataset.cr]; recompute(); }
+  if(t.dataset.addl!=null && t.value){ (S.codeLayers[t.dataset.addl]=S.codeLayers[t.dataset.addl]||[]).push(t.value); saveMaps(); recompute(); }
+  if(t.dataset.cz!=null){ S.codeZ[t.dataset.cz]= t.value===''? null : parseFloat(t.value); recompute(); }
+});
+$('#pane-codes').addEventListener('click',e=>{ const b=e.target.closest('button[data-rml]'); if(!b) return; const c=b.dataset.rml; S.codeLayers[c]=(S.codeLayers[c]||[]).filter(l=>l!==b.dataset.l); saveMaps(); recompute(); });
+function saveMaps(){ const m=load('codemap',{}); for(const k in S.codeLayers) if(k) m[k]=S.codeLayers[k]; store('codemap',m); const mm2=load('codemethod',{}); Object.assign(mm2,S.codeMethod); store('codemethod',mm2); }
+
+const COLS=[
+  {k:'rep',t:'Rap.'},{k:'id',t:'Point'},{k:'code',t:'Code'},{k:'kind',t:'Méth.'},{k:'dE',t:'ΔE mm',n:1},{k:'dN',t:'ΔN mm',n:1},{k:'d',t:'Écart mm',n:1},{k:'ec',t:'EC mm',n:1},{k:'dZ',t:'ΔZ mm',n:1,z:1},{k:'status',t:'Statut'},{k:'axes',t:'Axes'},{k:'layer',t:'Calque'},{k:'file',t:'Fichier'}
+];
+function val(p,k){ const r=p.res||{}; switch(k){case 'id':return p.id;case 'code':return p.code;case 'kind':return r.kind||'';case 'dE':return r.dE;case 'dN':return r.dN;case 'd':return r.d;case 'ec':return r.ec;case 'dZ':return r.dZ;case 'status':return ({doubt:0,out:1,ok:2,ex:3,nc:4,st:5})[p.status];case 'layer':return r.layer||'';case 'file':return p.file;case 'rep':return p.rep?0:1;case 'axes':return p.axRes.map(a=>a.name).join(' ')||'~';default:return p.idx;} }
+function filtered(){
+  const f=S.filter;
+  return ALL.filter(p=> f==='all' ? true : f==='ctl' ? (p.status!=='nc'&&p.status!=='st') : f==='dup' ? !!p.dupGroup : f==='rep' ? p.rep : f==='axe' ? p.axes.length>0 : p.status===f);
+}
+function renderPoints(){
+  const counts={all:ALL.length,ctl:0,ok:0,out:0,doubt:0,ex:0,nc:0,st:0,dup:0,rep:0,axe:0};
+  for(const p of ALL){ counts[p.status]++; if(p.status!=='nc'&&p.status!=='st')counts.ctl++; if(p.dupGroup)counts.dup++; if(p.rep)counts.rep++; if(p.axes.length)counts.axe++; }
+  $('#nPts').textContent=ALL.length||'';
+  $('#nRep').textContent=counts.rep||'';
+  const fl=[['all','Tous'],['ctl','Contrôlés'],['out','Hors tol.'],['doubt','Douteux'],['dup','Doublons'],['ex','Exclus'],['nc','Non classés'],['st','Stations / réf.'],['axe','Liés à un axe'],['rep','Au rapport']];
+  let rows=filtered(); const {k,dir}=S.sort;
+  rows.sort((a,b)=>{ let x=val(a,k),y=val(b,k); if(k==='d'||k==='ec'||k==='dZ'||k==='dE'||k==='dN'){ x=x==null?Infinity:Math.abs(x); y=y==null?Infinity:Math.abs(y);} if(x==null)x=''; if(y==null)y=''; return (x>y?1:x<y?-1:0)*dir || a.idx-b.idx; });
+  const is3D=S.mode==='3D';
+  const cols=COLS.filter(c=>!c.z||is3D);
+  const MAX=1500;
+  let h=`<div class="filters" role="group" aria-label="Filtrer">${fl.map(([v,t])=>`<button data-flt="${v}" aria-pressed="${S.filter===v}">${t} <span class="mono">${counts[v]}</span></button>`).join('')}</div>
+    <p class="help">Cliquez une ligne pour la localiser sur le plan. Maj + glisser sur le plan pour sélectionner plusieurs points.</p>
+    <div class="tablewrap"><table><thead><tr>${cols.map(c=>`<th data-sk="${c.k}" class="${c.n?'num':''}">${c.t}${S.sort.k===c.k?(S.sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>`;
+  for(const p of rows.slice(0,MAX)){
+    const r=p.res||{};
+    h+=`<tr class="row ${S.sel.has(p.uid)?'sel':''} ${p.status==='ex'?'isex':''}" data-uid="${esc(p.uid)}" tabindex="0">`+cols.map(c=>{
+      switch(c.k){
+        case 'id': return `<td class="mono">${esc(p.id)}</td>`;
+        case 'code': return `<td class="mono">${esc(p.code)}</td>`;
+        case 'kind': return `<td>${r.kind==='vertex'?'Sommet':r.kind==='line'?'Ligne':''}</td>`;
+        case 'dE': return `<td class="num">${r.kind?smm(r.dE):''}</td>`;
+        case 'dN': return `<td class="num">${r.kind?smm(r.dN):''}</td>`;
+        case 'd': return `<td class="num"><b>${r.kind?mm(r.d):''}</b></td>`;
+        case 'ec': return `<td class="num">${r.ec!=null?smm(r.ec):''}</td>`;
+        case 'dZ': return `<td class="num">${r.dZ!=null?smm(r.dZ):''}</td>`;
+        case 'status': return `<td>${pill(p.status)}${p.dupGroup?' <span class="pill dup">doublon</span>':''}</td>`;
+        case 'layer': return `<td class="mono">${esc(r.layer||'')}</td>`;
+        case 'file': return `<td>${esc(p.file)}</td>`;
+        case 'rep': return `<td class="chk"><input type="checkbox" data-rep="${esc(p.uid)}" ${p.rep?'checked':''} aria-label="Inclure ${esc(p.id)} au rapport"></td>`;
+        case 'axes': return `<td class="mono">${p.axRes.map(a=>`${esc(a.name)}${a.d!=null?' '+smm(a.d):''}`).join(' · ')}</td>`;
+      }}).join('')+`</tr>`;
+  }
+  h+=`</tbody></table></div>${rows.length>MAX?`<p class="help">${rows.length-MAX} lignes de plus : filtrez pour les voir.</p>`:''}
+    <div class="actions"><button class="btn small" data-repall="1">Ajouter les ${rows.length} points affichés au rapport</button><button class="btn small" data-repall="0">Les retirer du rapport</button></div>`;
+  $('#pane-points').innerHTML=h;
+}
+$('#pane-points').addEventListener('change',e=>{ const t=e.target; if(t.dataset.rep){ const p=ALL.find(q=>q.uid===t.dataset.rep); if(p){ p.rep=t.checked; renderReport(); renderDetail(); $('#nRep').textContent=ALL.filter(q=>q.rep).length||''; persist(); } } });
+$('#pane-points').addEventListener('click',e=>{
+  if(e.target.matches('input[data-rep]')) return;
+  const ra=e.target.closest('[data-repall]'); if(ra){ const on=ra.dataset.repall==='1'; for(const p of filtered()) p.rep=on; toast(on?'Points ajoutés au rapport':'Points retirés du rapport'); recompute(); return; }
+  const fb=e.target.closest('[data-flt]'); if(fb){ S.filter=fb.dataset.flt; renderPoints(); return; }
+  const th=e.target.closest('th[data-sk]'); if(th){ const k=th.dataset.sk; S.sort = S.sort.k===k? {k,dir:-S.sort.dir} : {k,dir:(k==='d'||k==='ec'||k==='dZ'||k==='dE'||k==='dN')?-1:1}; renderPoints(); return; }
+  const tr=e.target.closest('tr[data-uid]'); if(tr){ const p=ALL.find(q=>q.uid===tr.dataset.uid); if(!p) return; if(!(e.ctrlKey||e.metaKey)) S.sel.clear(); S.sel.add(p.uid); zoomTo(p); refreshSel(); }
+});
+$('#pane-points').addEventListener('keydown',e=>{ if(e.key==='Enter'){ const tr=e.target.closest('tr[data-uid]'); if(tr) tr.click(); } });
+
+function stats(arr){ const ds=arr.map(p=>p.res.d); const n=ds.length; if(!n) return {n:0}; const max=Math.max(...ds); const rms=Math.sqrt(ds.reduce((s,d)=>s+d*d,0)/n); const mean=ds.reduce((s,d)=>s+d,0)/n; const zs=arr.map(p=>p.res.dZ).filter(v=>v!=null); const zmax=zs.length?Math.max(...zs.map(Math.abs)):null; const zrms=zs.length?Math.sqrt(zs.reduce((s,d)=>s+d*d,0)/zs.length):null; return {n,max,rms,mean,zmax,zrms,zn:zs.length}; }
+function renderReport(){
+  const ctl=ALL.filter(p=>['ok','out','doubt'].includes(p.status));
+  const c={ok:0,out:0,doubt:0,ex:0,nc:0}; for(const p of ALL) c[p.status]++;
+  const st=stats(ctl.filter(p=>p.status!=='doubt'));
+  const tot=ctl.length||1; const is3D=S.mode==='3D';
+  const rp=ALL.filter(p=>p.rep); const R=S.rep;
+  const nAx=rp.filter(p=>p.axes.length).length;
+  let h=`<div class="sect"><h4>Rapport d'implantation</h4>
+    <p class="help"><b>${rp.length}</b> point(s) choisi(s)${rp.length?`, dont ${nAx} lié(s) à un axe`:''}. Cochez les points dans l'onglet Points, dans la fiche d'un point, ou ajoutez-les ici.</p>
+    <div class="actions" style="margin-top:8px">
+      <button class="btn small" data-radd="out">+ Hors tolérance</button>
+      <button class="btn small" data-radd="ctl">+ Tous les contrôlés</button>
+      <button class="btn small" data-radd="sel" ${S.sel.size?'':'disabled'}>+ Sélection (${S.sel.size})</button>
+      <button class="btn small" data-radd="none" ${rp.length?'':'disabled'}>Vider</button>
+    </div></div>
+  <div class="fields">
+    <label>Projet<input type="text" id="rf-projet" value="${esc(R.projet)}" placeholder="ex. Entrepôt Laval – phase 2"></label>
+    <label>N° de dossier<input type="text" id="rf-mandat" value="${esc(R.mandat)}"></label>
+    <label>Client<input type="text" id="rf-client" value="${esc(R.client)}"></label>
+    <label>Lieu<input type="text" id="rf-lieu" value="${esc(R.lieu)}"></label>
+    <label>Préparé par<input type="text" id="rf-arpenteur" value="${esc(R.arpenteur)}"></label>
+    <label>Objet<select id="rf-only"><option value="all" ${R.only==='all'?'selected':''}>Tous les points choisis</option><option value="ok" ${R.only==='ok'?'selected':''}>Conformes seulement</option><option value="out" ${R.only==='out'?'selected':''}>Non conformes seulement</option></select></label>
+    <label class="wide">Remarques<input type="text" id="rf-notes" value="${esc(R.notes)}" placeholder="ex. Implantation des colonnes niveau dessus de semelles"></label>
+  </div>
+  <div class="opts">
+    <span>Regrouper :</span>
+    <label><input type="radio" name="rgrp" value="axis" ${R.group==='axis'?'checked':''}> par axe</label>
+    <label><input type="radio" name="rgrp" value="point" ${R.group==='point'?'checked':''}> par point</label>
+    <label><input type="checkbox" id="rf-sketch" ${R.sketch?'checked':''}> croquis</label>
+    <label><input type="checkbox" id="rf-coords" ${R.coords?'checked':''}> coordonnées</label>
+    <label><input type="checkbox" id="rf-refs" ${R.refs!==false?'checked':''}> stations et références</label>
+  </div>
+  <div class="actions"><button class="btn primary" id="bPreview" ${rp.length?'':'disabled'}>Aperçu du rapport</button><button class="btn" id="bRepHtml" ${rp.length?'':'disabled'}>Télécharger (HTML)</button><button class="btn" id="bRepCsv" ${rp.length?'':'disabled'}>CSV du rapport</button></div>
+  <p class="help">Le fichier HTML s'ouvre dans n'importe quel navigateur ; utilisez Imprimer → Enregistrer en PDF pour l'archiver.</p>
+
+  <div class="sect" style="margin-top:6px"><h4>Synthèse de l'analyse (tous les points)</h4></div>
+  <div class="tiles">
+    <div class="tile"><b>${ctl.length}</b><span>points contrôlés</span></div>
+    <div class="tile ok"><b>${c.ok}</b><span>conformes ≤ ${(S.tol*1000).toFixed(0)} mm</span></div>
+    <div class="tile out"><b>${c.out}</b><span>hors tolérance</span></div>
+    <div class="tile doubt"><b>${c.doubt}</b><span>association douteuse</span></div>
+    <div class="tile"><b>${c.ex}</b><span>exclus (dont doublons)</span></div>
+    <div class="tile"><b>${c.nc}</b><span>non classés</span></div>
+  </div>
+  <div class="bar" title="Répartition des points contrôlés"><i style="width:${c.ok/tot*100}%;background:var(--ok)"></i><i style="width:${c.out/tot*100}%;background:var(--out)"></i><i style="width:${c.doubt/tot*100}%;background:var(--doubt)"></i></div>
+  <p class="help">Écart en plan (hors douteux) : moyenne ${mm(st.mean)} mm · RMS ${mm(st.rms)} mm · max ${mm(st.max)} mm${is3D&&st.zn?` · ΔZ RMS ${mm(st.zrms)} mm · max ${mm(st.zmax)} mm (${st.zn} pts)`:''}.</p>
+  <div class="sect"><h4>Par code</h4><div class="tablewrap"><table><thead><tr><th>Code</th><th class="num">n</th><th class="num">Conf.</th><th class="num">Hors</th><th class="num">Dout.</th><th class="num">RMS mm</th><th class="num">Max mm</th>${is3D?'<th class="num">ΔZ RMS</th>':''}</tr></thead><tbody>`;
+  const by=new Map(); for(const p of ctl){ (by.get(p.code)||by.set(p.code,[]).get(p.code)).push(p); }
+  for(const [code,arr] of [...by.entries()].sort()){
+    const s=stats(arr.filter(p=>p.status!=='doubt'));
+    h+=`<tr><td class="mono">${esc(code)}</td><td class="num">${arr.length}</td><td class="num">${arr.filter(p=>p.status==='ok').length}</td><td class="num">${arr.filter(p=>p.status==='out').length}</td><td class="num">${arr.filter(p=>p.status==='doubt').length}</td><td class="num">${mm(s.rms)}</td><td class="num">${mm(s.max)}</td>${is3D?`<td class="num">${s.zn?mm(s.zrms):'—'}</td>`:''}</tr>`;
+  }
+  if(!by.size) h+=`<tr><td colspan="8">Aucun point contrôlé.</td></tr>`;
+  h+=`</tbody></table></div></div>
+  <div class="sect"><h4>Analyse complète</h4><div class="actions">
+    <button class="btn small" id="bCsv">Télécharger tous les points (CSV)</button>
+    <button class="btn small" id="bCopy">Copier</button></div>
+    <p class="help" style="margin-top:6px">CSV séparé par des points-virgules, décimales avec virgule (Excel en français).</p>
+    ${S.csvShown?`<textarea id="csvfallback" readonly aria-label="Rapport CSV">${esc(S.csvText||'')}</textarea>`:''}
+  </div>`;
+  $('#pane-report').innerHTML=h;
+}
+const csvCell=v=>{ v=String(v??''); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+const n3c=v=> v==null||isNaN(v)?'':v.toFixed(3).replace('.',',');
+function buildCSV(){
+  const n=n3c; const is3D=S.mode==='3D';
+  const L=[];
+  L.push('Contrôle d\'implantation — analyse complète');
+  L.push('Date;'+new Date().toLocaleString('fr-CA'));
+  L.push('Plan;'+(S.dxf?S.dxf.name:''));
+  L.push('Levés;'+S.files.filter(f=>f.on).map(f=>f.name).join(' | '));
+  L.push('Traitement;'+S.mode);
+  L.push('Tolérance plan (m);'+n(S.tol)+(is3D?';Tolérance Z (m);'+n(S.tolZ):''));
+  L.push('');
+  L.push(['Fichier','Point','Code','Attribut','Est','Nord','Z mesuré','Méthode','Calque réf.','E théo','N théo','ΔE','ΔN','Écart plan','EC (+droite)', ...(is3D?['Z théo','Source Z','ΔZ']:[]),'Axes (Δ mm)','Au rapport','Statut','Remarque'].join(';'));
+  const ox=S.dxf?S.dxf.ox:0, oy=S.dxf?S.dxf.oy:0;
+  for(const p of ALL){
+    const r=p.res||{};
+    const note=[p.ex?(p.exMode==='out'?'Exclu manuellement':p.autoEx):'', p.note].filter(Boolean).join(' · ');
+    L.push([p.file,p.id,p.code,p.attr,n(p.E),n(p.N),n(p.Z), r.kind==='vertex'?'Sommet':r.kind==='line'?'Ligne':'', r.layer||'', r.kind?n(r.tx+ox):'', r.kind?n(r.ty+oy):'', n(r.dE), n(r.dN), n(r.d), n(r.ec), ...(is3D?[n(r.zth), r.zsrc||'', n(r.dZ)]:[]), p.axRes.map(a=>a.name+(a.d!=null?' '+(a.d*1000).toFixed(1):'')).join(' | '), p.rep?'oui':'', STAT_LBL[p.status], note].map(csvCell).join(';'));
+  }
+  return '﻿'+L.join('\r\n');
+}
+
+/* ---------- Rapport d'implantation (document) ---------- */
+function repPoints(){
+  const o=S.rep.only;
+  return ALL.filter(p=>p.rep).filter(p=> o==='all' ? true : o==='ok' ? refRows(p).every(r=>r.st==='ok') : refRows(p).some(r=>r.st==='out'||r.st==='doubt')).sort((a,b)=>natCmp(a.id,b.id)||a.idx-b.idx);
+}
+function refRows(p){
+  // une ligne par référence : chaque axe lié, sinon la ligne / le sommet du plan
+  if(p.axRes.length) return p.axRes.map(a=>({type:'axe', ref:'Axe '+a.name, axis:a.id, pm:a.pm, th:a.ot, me:a.om, d:a.d, st:a.st}));
+  const r=p.res;
+  if(!r) return [{type:'none', ref:'Aucune référence', st:p.status}];
+  if(r.kind==='line') return [{type:'ligne', ref:'Ligne '+r.layer, th:0, me:r.ec, d:r.ec, st:p.status}];
+  return [{type:'sommet', ref:'Sommet '+r.layer, dE:r.dE, dN:r.dN, d:r.d, st:p.status}];
+}
+const RPT_CSS=`
+.rpt{font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;color:#1b1f1d;font-size:11.5px;line-height:1.4;padding:28px 34px;background:#fff}
+.rpt h1{font-size:22px;margin:0 0 2px;letter-spacing:.01em}
+.rpt h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#0d6b74;margin:20px 0 6px;border-bottom:1.5px solid #0d6b74;padding-bottom:3px}
+.rpt h3{font-size:12.5px;margin:14px 0 4px}
+.rpt .sub{color:#5b6762;font-size:11px}
+.rpt .head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border-bottom:3px solid #1b1f1d;padding-bottom:10px}
+.rpt .meta{display:grid;grid-template-columns:auto auto;gap:1px 12px;font-size:11px}
+.rpt .meta b{color:#5b6762;font-weight:600}
+.rpt .sum{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+.rpt .sum div{border:1px solid #cfd6d2;border-radius:4px;padding:5px 10px;min-width:90px}
+.rpt .sum b{display:block;font-size:18px}
+.rpt table{border-collapse:collapse;width:100%;margin:4px 0 6px;font-size:11px}
+.rpt th{background:#eef2f0;text-align:left;font-weight:600;padding:4px 6px;border-bottom:1px solid #9aa6a0;white-space:nowrap}
+.rpt td{padding:3px 6px;border-bottom:1px solid #e1e6e3;vertical-align:top}
+.rpt td.n,.rpt th.n{text-align:right;font-family:Consolas,"SFMono-Regular",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rpt td.pt{font-weight:600;font-family:Consolas,monospace}
+.rpt .ok{color:#1f7a43;font-weight:600}.rpt .out{color:#c0392b;font-weight:700}.rpt .doubt{color:#6d3fb3;font-weight:700}.rpt .ex,.rpt .nc{color:#888}
+.rpt tr.bad td{background:#fdf0ee}
+.rpt .sk{border:1px solid #cfd6d2;margin:4px 0}
+.rpt .note{color:#5b6762;font-size:10.5px}
+.rpt .sign{display:flex;gap:40px;margin-top:28px}
+.rpt .sign div{flex:1;border-top:1px solid #1b1f1d;padding-top:4px;font-size:10.5px;color:#5b6762}
+@media print{.rpt{padding:0}.rpt h2{break-after:avoid}.rpt tr{break-inside:avoid}@page{size:letter;margin:14mm}}
+`;
+function stTxt(st){ return `<span class="${st}">${({ok:'Conforme',out:'Hors tol.',doubt:'Douteux',ex:'Exclu',nc:'—'})[st]||'—'}</span>`; }
+const f3r=v=>v==null||isNaN(v)?'—':(Math.abs(v)<0.0005?0:v).toFixed(3);
+const smr=v=>v==null||isNaN(v)?'—':((v>=0?'+':'−')+Math.abs(v*1000).toFixed(1));
+function clipSeg(x1,y1,x2,y2,b){ // Liang–Barsky
+  let t0=0,t1=1; const dx=x2-x1, dy=y2-y1;
+  for(const [p,q] of [[-dx,x1-b.x0],[dx,b.x1-x1],[-dy,y1-b.y0],[dy,b.y1-y1]]){ if(p===0){ if(q<0) return null; } else { const r=q/p; if(p<0){ if(r>t1) return null; if(r>t0) t0=r; } else { if(r<t0) return null; if(r<t1) t1=r; } } }
+  return [x1+t0*dx,y1+t0*dy,x1+t1*dx,y1+t1*dy];
+}
+function sketchSVG(pts){
+  if(!pts.length) return '';
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const p of pts){ x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);y1=Math.max(y1,p.y); }
+  let w=x1-x0, hgt=y1-y0; const m=Math.max(1.5,Math.max(w,hgt)*0.12); x0-=m;x1+=m;y0-=m;y1+=m; w=x1-x0; hgt=y1-y0;
+  if(w<4){ const c=(x0+x1)/2; x0=c-2;x1=c+2;w=4; } if(hgt<4){ const c=(y0+y1)/2; y0=c-2;y1=c+2;hgt=4; }
+  const W=820; let s=W/w; let H=hgt*s; if(H>560){ s=560/hgt; H=560; } const Wd=w*s;
+  const X=x=>((x-x0)*s).toFixed(1), Y=y=>((y1-y)*s).toFixed(1);
+  const b={x0,y0,x1,y1};
+  const lays=new Set(); for(const p of pts){ if(p.res) lays.add(p.res.layer); for(const l of layersFor(p)) lays.add(l); }
+  let g=''; let n=0;
+  for(const ln of lays){ const G=S.dxf.layers[ln]?.segs; if(!G) continue; let d='';
+    for(let k=0;k<G.length&&n<6000;k+=6){ const c=clipSeg(G[k],G[k+1],G[k+3],G[k+4],b); if(!c) continue; d+=`M${X(c[0])} ${Y(c[1])}L${X(c[2])} ${Y(c[3])}`; n++; }
+    if(d) g+=`<path d="${d}" stroke="#b9c2be" stroke-width="0.8" fill="none"/>`; }
+  const used=new Set(); for(const p of pts) for(const id of p.axes) used.add(id);
+  for(const a of S.axes){ const ga=axGeom(a); const c=clipSeg(ga.x1-ga.ux*1e3,ga.y1-ga.uy*1e3,ga.x2+ga.ux*1e3,ga.y2+ga.uy*1e3,b); if(!c) continue; const on=used.has(a.id);
+    g+=`<path d="M${X(c[0])} ${Y(c[1])}L${X(c[2])} ${Y(c[3])}" stroke="#0d6b74" stroke-width="${on?1.3:0.7}" stroke-dasharray="9 3 2 3" opacity="${on?1:0.55}" fill="none"/>`;
+    const lx=+X(c[0])+(+X(c[2])-+X(c[0]))*0.04, ly=+Y(c[1])+(+Y(c[3])-+Y(c[1]))*0.04;
+    g+=`<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="10" fill="#fff" stroke="#0d6b74" stroke-width="1.2"/><text x="${lx.toFixed(1)}" y="${(ly+3.6).toFixed(1)}" font-size="${a.name.length>3?8:10}" text-anchor="middle" font-weight="700" fill="#0d6b74">${esc(a.name)}</text>`; }
+  const col={ok:'#1f7a43',out:'#c0392b',doubt:'#6d3fb3',ex:'#999',nc:'#999'};
+  for(const p of pts){ const rows=refRows(p); const st=rows.some(r=>r.st==='doubt')?'doubt':rows.some(r=>r.st==='out')?'out':rows[0].st;
+    g+=`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="3.6" fill="${col[st]||'#999'}" stroke="#fff" stroke-width="1"/><text x="${(+X(p.x)+5).toFixed(1)}" y="${(+Y(p.y)-4).toFixed(1)}" font-size="9" fill="#333" font-family="Consolas,monospace">${esc(p.id)}</text>`; }
+  // échelle + nord
+  const tgt=(Wd*0.18)/s; const p10=Math.pow(10,Math.floor(Math.log10(tgt))); let u=p10; for(const k of [1,2,5]) if(k*p10<=tgt) u=k*p10;
+  const sl=u*s; g+=`<g transform="translate(${(Wd-sl-16).toFixed(1)},${(H-14).toFixed(1)})"><path d="M0 0H${sl.toFixed(1)}M0 -4V0M${sl.toFixed(1)} -4V0" stroke="#333" stroke-width="1.2" fill="none"/><text x="${(sl/2).toFixed(1)}" y="-6" font-size="9" text-anchor="middle" fill="#333">${u>=1?u+' m':(u*1000)+' mm'}</text></g>`;
+  g+=`<g transform="translate(20,26)"><path d="M0 -14L5 4L0 0L-5 4Z" fill="#333"/><text x="0" y="16" font-size="9" text-anchor="middle" font-weight="700" fill="#333">N</text></g>`;
+  return `<svg class="sk" viewBox="0 0 ${Wd.toFixed(0)} ${H.toFixed(0)}" width="100%" style="max-width:${Wd.toFixed(0)}px" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fff"/>${g}</svg>`;
+}
+function reportBody(){
+  const R=S.rep, pts=repPoints(), is3D=S.mode==='3D';
+  const ox=S.dxf?S.dxf.ox:0, oy=S.dxf?S.dxf.oy:0;
+  const rows=pts.flatMap(p=>refRows(p).map(r=>({p,r})));
+  const cnt={ok:0,out:0,doubt:0,ex:0,nc:0}; rows.forEach(o=>cnt[o.r.st]=(cnt[o.r.st]||0)+1);
+  const dmax=Math.max(0,...rows.filter(o=>o.r.d!=null&&o.r.st!=='ex').map(o=>Math.abs(o.r.d)));
+  const today=new Date().toLocaleDateString('fr-CA',{year:'numeric',month:'long',day:'numeric'});
+  let h=`<div class="head"><div><h1>Rapport d'implantation</h1><div class="sub">${esc(R.projet||'Projet')}${R.lieu?' · '+esc(R.lieu):''}</div></div>
+    <div class="meta"><b>Date</b><span>${today}</span>${R.mandat?`<b>Dossier</b><span>${esc(R.mandat)}</span>`:''}${R.client?`<b>Client</b><span>${esc(R.client)}</span>`:''}<b>Plan</b><span>${esc(S.dxf?S.dxf.name:'')}</span><b>Levé(s)</b><span>${esc(S.files.filter(f=>f.on).map(f=>f.name).join(', '))}</span><b>Tolérance</b><span>${(S.tol*1000).toFixed(0)} mm en plan${is3D?' · '+(S.tolZ*1000).toFixed(0)+' mm en Z':''}</span>${R.arpenteur?`<b>Préparé par</b><span>${esc(R.arpenteur)}</span>`:''}</div></div>`;
+  if(R.notes) h+=`<p style="margin:10px 0 0">${esc(R.notes)}</p>`;
+  h+=`<div class="sum"><div><b>${pts.length}</b>points</div><div><b>${rows.length}</b>contrôles</div><div><b class="ok">${cnt.ok||0}</b>conformes</div><div><b class="out">${(cnt.out||0)+(cnt.doubt||0)}</b>non conformes</div><div><b>${rows.length?(dmax*1000).toFixed(1):'—'}</b>écart max (mm)</div></div>`;
+  h+=`<p class="note">PM : chaînage le long de l'axe depuis son origine. EC : distance perpendiculaire à l'axe, positive à droite dans le sens de l'axe. Écart = mesuré − théorique. Théorique = élément du plan le plus proche selon le code du point (sommet, ligne, ou intersection de la ligne avec un axe).</p>`;
+  if(R.sketch && S.dxf) h+=`<h2>Croquis</h2>${sketchSVG(pts)}`;
+  const zc = is3D ? '<th class="n">ΔZ mm</th>' : '';
+  const zv = p => is3D ? `<td class="n">${p.res&&p.res.dZ!=null?smr(p.res.dZ):'—'}</td>` : '';
+  if(R.group==='axis'){
+    const byAx=new Map(); const noAx=[];
+    for(const p of pts){ if(p.axRes.length){ for(const a of p.axRes){ (byAx.get(a.id)||byAx.set(a.id,[]).get(a.id)).push({p,a}); } } else noAx.push(p); }
+    const axes=[...byAx.keys()].map(axisById).sort((a,b)=>natCmp(a.name,b.name));
+    if(axes.length) h+=`<h2>Écarts par axe</h2>`;
+    for(const a of axes){
+      const list=byAx.get(a.id).sort((u,v)=>u.a.pm-v.a.pm);
+      h+=`<h3>Axe ${esc(a.name)} <span class="sub">— gisement ${gisement(a)}</span></h3><table><thead><tr><th>Point</th><th>Code</th><th class="n">PM (m)</th><th class="n">EC théo (m)</th><th class="n">EC mesuré (m)</th><th class="n">Écart (mm)</th>${zc}<th>Statut</th><th>Remarque</th></tr></thead><tbody>`;
+      for(const {p,a:ar} of list) h+=`<tr class="${ar.st==='out'||ar.st==='doubt'?'bad':''}"><td class="pt">${esc(p.id)}</td><td>${esc(p.code)}</td><td class="n">${f3r(ar.pm)}</td><td class="n">${f3r(ar.ot)}</td><td class="n">${f3r(ar.om)}</td><td class="n"><b>${smr(ar.d)}</b></td>${zv(p)}<td>${stTxt(ar.st)}</td><td>${esc(p.note)}</td></tr>`;
+      h+=`</tbody></table>`;
+    }
+    if(noAx.length){
+      h+=`<h2>Points sans axe (référence au plan)</h2><table><thead><tr><th>Point</th><th>Code</th><th>Référence</th><th class="n">ΔE (mm)</th><th class="n">ΔN (mm)</th><th class="n">EC (mm)</th><th class="n">Écart (mm)</th>${zc}<th>Statut</th><th>Remarque</th></tr></thead><tbody>`;
+      for(const p of noAx){ const r=refRows(p)[0]; const res=p.res||{}; h+=`<tr class="${r.st==='out'||r.st==='doubt'?'bad':''}"><td class="pt">${esc(p.id)}</td><td>${esc(p.code)}</td><td>${esc(r.ref)}</td><td class="n">${smr(res.dE)}</td><td class="n">${smr(res.dN)}</td><td class="n">${res.ec!=null?smr(res.ec):'—'}</td><td class="n"><b>${res.d!=null?(res.d*1000).toFixed(1):'—'}</b></td>${zv(p)}<td>${stTxt(r.st)}</td><td>${esc(p.note)}</td></tr>`; }
+      h+=`</tbody></table>`;
+    }
+  } else {
+    h+=`<h2>Écarts par point</h2><table><thead><tr><th>Point</th><th>Code</th><th>Référence</th><th class="n">PM (m)</th><th class="n">Théorique</th><th class="n">Mesuré</th><th class="n">Écart (mm)</th>${zc}<th>Statut</th></tr></thead><tbody>`;
+    for(const p of pts){ const rr=refRows(p);
+      rr.forEach((r,i)=>{ const th = r.type==='axe'? 'EC '+f3r(r.th) : r.type==='ligne' ? 'EC 0.000' : '—';
+        const me = r.type==='axe'||r.type==='ligne' ? 'EC '+f3r(r.me) : r.type==='sommet' ? `ΔE ${smr(r.dE)} · ΔN ${smr(r.dN)}` : '—';
+        const dv = r.type==='sommet' ? (r.d*1000).toFixed(1) : smr(r.d);
+        h+=`<tr class="${r.st==='out'||r.st==='doubt'?'bad':''}">${i===0?`<td class="pt" rowspan="${rr.length}">${esc(p.id)}</td><td rowspan="${rr.length}">${esc(p.code)}</td>`:''}<td>${esc(r.ref)}</td><td class="n">${r.pm!=null?f3r(r.pm):'—'}</td><td class="n">${th}</td><td class="n">${me}</td><td class="n"><b>${dv}</b></td>${i===0&&is3D?`<td class="n" rowspan="${rr.length}">${p.res&&p.res.dZ!=null?smr(p.res.dZ):'—'}</td>`:''}<td>${stTxt(r.st)}</td></tr>`; });
+    }
+    h+=`</tbody></table>`;
+  }
+  if(R.refs!==false){
+    const st=ALL.filter(p=>p.status==='st');
+    if(st.length){
+      h+=`<h2>Stations et références</h2><table><thead><tr><th>Point</th><th>Rôle</th><th>Description</th><th class="n">Est</th><th class="n">Nord</th><th class="n">Z</th><th>Levé</th></tr></thead><tbody>`;
+      for(const p of [...st].sort((a,b)=>({station:0,ref:1,verif:2})[a.roleEff]-({station:0,ref:1,verif:2})[b.roleEff]||a.idx-b.idx)) h+=`<tr><td class="pt">${esc(p.id)}</td><td>${esc(ROLE_LBL[p.roleEff])}</td><td>${esc(p.desc)}</td><td class="n">${f3r(p.E)}</td><td class="n">${f3r(p.N)}</td><td class="n">${f3r(p.Z)}</td><td>${esc(p.file)}</td></tr>`;
+      h+=`</tbody></table>`;
+      const cl=refChecks();
+      if(cl.length){
+        h+=`<h3>Contrôle des références (observations répétées à moins de 50 mm)</h3><table><thead><tr><th>Référence</th><th>Observation</th><th>Levé</th><th class="n">ΔE (mm)</th><th class="n">ΔN (mm)</th><th class="n">Δ plan (mm)</th><th class="n">ΔZ (mm)</th></tr></thead><tbody>`;
+        for(const g of cl){ const b=g[0]; g.slice(1).forEach((q,i)=>{ const dE=q.E-b.E, dN=q.N-b.N, dz=(q.Z!=null&&b.Z!=null)?q.Z-b.Z:null; h+=`<tr class="${Math.hypot(dE,dN)>S.tol?'bad':''}">${i===0?`<td class="pt" rowspan="${g.length-1}">${esc(b.id)}<div class="note">${esc(b.desc)}</div></td>`:''}<td class="pt">${esc(q.id)} <span class="note">${esc(ROLE_LBL[q.roleEff].split(' ')[0])}</span></td><td>${esc(q.file)}</td><td class="n">${smr(dE)}</td><td class="n">${smr(dN)}</td><td class="n"><b>${(Math.hypot(dE,dN)*1000).toFixed(1)}</b></td><td class="n">${smr(dz)}</td></tr>`; }); }
+        h+=`</tbody></table>`;
+      }
+    }
+  }
+  if(R.coords){
+    h+=`<h2>Coordonnées</h2><table><thead><tr><th>Point</th><th>Description</th><th class="n">Est mesuré</th><th class="n">Nord mesuré</th><th class="n">Z mesuré</th><th class="n">Est théo</th><th class="n">Nord théo</th>${is3D?'<th class="n">Z théo</th>':''}<th>Levé</th></tr></thead><tbody>`;
+    for(const p of pts){ const r=p.res; h+=`<tr><td class="pt">${esc(p.id)}</td><td>${esc(p.desc)}</td><td class="n">${f3r(p.E)}</td><td class="n">${f3r(p.N)}</td><td class="n">${f3r(p.Z)}</td><td class="n">${r?f3r((p.thPt?p.thPt[0]:r.tx)+ox):'—'}</td><td class="n">${r?f3r((p.thPt?p.thPt[1]:r.ty)+oy):'—'}</td>${is3D?`<td class="n">${r&&r.zth!=null?f3r(r.zth):'—'}</td>`:''}<td>${esc(p.file)}</td></tr>`; }
+    h+=`</tbody></table>`;
+  }
+  h+=`<div class="sign"><div>Préparé par${R.arpenteur?' : '+esc(R.arpenteur):''}</div><div>Vérifié par</div><div>Date</div></div>`;
+  return h;
+}
+function refChecks(){
+  // regroupe les références / vérifications observées plusieurs fois (même endroit à moins de 50 mm)
+  const pts=ALL.filter(p=>p.status==='st' && (p.roleEff==='ref'||p.roleEff==='verif'));
+  const used=new Set(), out=[];
+  for(const p of pts){ if(used.has(p.uid)) continue; const g=pts.filter(q=>!used.has(q.uid) && Math.hypot(q.E-p.E,q.N-p.N)<0.05); g.forEach(q=>used.add(q.uid)); if(g.length>1) out.push(g); }
+  return out;
+}
+function reportHTMLFile(){
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport d'implantation${S.rep.projet?' – '+esc(S.rep.projet):''}</title><style>body{margin:0;background:#fff}${RPT_CSS}</style></head><body><div class="rpt">${reportBody()}</div></body></html>`;
+}
+function reportCSV(){
+  const is3D=S.mode==='3D'; const n=n3c; const L=[];
+  L.push('Rapport d\'implantation'); L.push('Projet;'+csvCell(S.rep.projet)); L.push('Dossier;'+csvCell(S.rep.mandat)); L.push('Date;'+new Date().toLocaleDateString('fr-CA')); L.push('Plan;'+csvCell(S.dxf?S.dxf.name:'')); L.push('Tolérance plan (m);'+n(S.tol)); L.push('');
+  L.push(['Point','Code','Référence','PM (m)','EC théo (m)','EC mesuré (m)','ΔE (m)','ΔN (m)','Écart (m)',...(is3D?['ΔZ (m)']:[]),'Statut','Est','Nord','Z','Remarque'].join(';'));
+  for(const p of repPoints()) for(const r of refRows(p)) L.push([p.id,p.code,r.ref, n(r.pm), r.type==='ligne'?n(0):n(r.th), n(r.me), n(r.dE), n(r.dN), n(r.d), ...(is3D?[n(p.res&&p.res.dZ)]:[]), ({ok:'Conforme',out:'Hors tolérance',doubt:'Douteux',ex:'Exclu',nc:''})[r.st]||'', n(p.E), n(p.N), n(p.Z), p.note].map(csvCell).join(';'));
+  return '﻿'+L.join('\r\n');
+}
+function fileStem(){ return (S.dxf?S.dxf.name.replace(/\.dxf$/i,''):'implantation')+'_'+new Date().toISOString().slice(0,10); }
+async function saveFile(filename,data,label){
+  const dl=await getDownloads();
+  if(dl){ try{ await dl.save({filename,data}); toast(label+' enregistré'); return; }catch(err){ if(err&&err.code==='declined') return; } }
+  S.csvText=data.replace(/^﻿/,''); S.csvShown=true; renderReport(); toast('Téléchargement indisponible ici : le contenu est affiché en bas de l\'onglet Rapport');
+}
+function openPreview(){ $('#rptPage').innerHTML=`<style>${RPT_CSS}</style><div class="rpt">${reportBody()}</div>`; $('#modal').hidden=false; $('#mClose').focus(); }
+$('#mClose').onclick=()=>{ $('#modal').hidden=true; };
+$('#mHtml').onclick=()=>saveFile('rapport_implantation_'+fileStem()+'.html',reportHTMLFile(),'Rapport');
+$('#mCsv').onclick=()=>saveFile('rapport_implantation_'+fileStem()+'.csv',reportCSV(),'CSV');
+$('#modal').addEventListener('keydown',e=>{ if(e.key==='Escape') $('#modal').hidden=true; });
+$('#pane-report').addEventListener('input',e=>{ const t=e.target; if(t.id&&t.id.startsWith('rf-')&&t.type==='text'){ S.rep[t.id.slice(3)]=t.value; store('rep',S.rep); } });
+$('#pane-report').addEventListener('change',e=>{ const t=e.target;
+  if(t.name==='rgrp'){ S.rep.group=t.value; store('rep',S.rep); }
+  if(t.id==='rf-sketch'){ S.rep.sketch=t.checked; store('rep',S.rep); }
+  if(t.id==='rf-coords'){ S.rep.coords=t.checked; store('rep',S.rep); }
+  if(t.id==='rf-refs'){ S.rep.refs=t.checked; store('rep',S.rep); }
+  if(t.id==='rf-only'){ S.rep.only=t.value; store('rep',S.rep); }
+});
+$('#pane-report').addEventListener('click',async e=>{
+  const t=e.target.closest('button'); if(!t) return;
+  if(t.dataset.radd){ const m=t.dataset.radd;
+    for(const p of ALL){ if(m==='none') p.rep=false; else if(m==='out'&&(p.status==='out'||p.status==='doubt')) p.rep=true; else if(m==='ctl'&&['ok','out','doubt'].includes(p.status)) p.rep=true; else if(m==='sel'&&S.sel.has(p.uid)) p.rep=true; }
+    recompute(); return; }
+  if(t.id==='bPreview'){ openPreview(); return; }
+  if(t.id==='bRepHtml'){ saveFile('rapport_implantation_'+fileStem()+'.html',reportHTMLFile(),'Rapport'); return; }
+  if(t.id==='bRepCsv'){ saveFile('rapport_implantation_'+fileStem()+'.csv',reportCSV(),'CSV'); return; }
+  if(t.id==='bCsv'){ saveFile('controle_'+fileStem()+'.csv',buildCSV(),'CSV'); return; }
+  if(t.id==='bCopy'){ const csv=buildCSV().replace(/^﻿/,''); try{ await navigator.clipboard.writeText(csv); toast('Copié — collez-le dans Excel'); }catch(_){ S.csvText=csv; S.csvShown=true; renderReport(); const ta=$('#csvfallback'); ta.focus(); ta.select(); toast('Copie bloquée : texte sélectionné, faites Ctrl+C'); } }
+});
+
+/* ============================================================
+   Dossier d'implantation partagé (.json versionné)
+   ============================================================ */
+function collectPstate(){
+  const ps={...S.pstate};
+  for(const p of ALL){ const st={}; if(p.exMode) st.exMode=p.exMode; if(p.method) st.method=p.method; if(p.layer) st.layer=p.layer; if(p.note) st.note=p.note; if(p.axes.length) st.axes=p.axes; if(p.rep) st.rep=1; if(p.role) st.role=p.role;
+    if(Object.keys(st).length) ps[p.pkey]=st; else delete ps[p.pkey]; }
+  return ps;
+}
+function dossierData(note){
+  const prev=S.dossier||{version:0,historique:[]};
+  const version=(prev.version||0)+1, date=new Date().toISOString(), par=S.rep.arpenteur||'';
+  return {
+    format:'dossier-implantation', formatVersion:1, version, date, par,
+    plan:S.dxf?S.dxf.name:null, leves:S.files.map(f=>({nom:f.name, ordre:f.order})),
+    mode:S.mode, regles:{tol:S.tol,tolZ:S.tolZ,snap:S.snap,doubt:S.doubt,dup:S.dup,axisMax:S.axisMax},
+    codes:{calques:S.codeLayers, methodes:S.codeMethod, roles:S.codeRole, zConception:S.codeZ},
+    axes:S.axes.map(({id,name,x1,y1,x2,y2,manual})=>({id,name,x1,y1,x2,y2,manual:!!manual})),
+    points:collectPstate(), doublonsGardes:S.dupKeep,
+    rapport:S.rep,
+    historique:[...(prev.historique||[]), {version,date,par,note:note||''}].slice(-200)
+  };
+}
+function applyDossier(d){
+  if(!d || d.format!=='dossier-implantation') throw new Error('format');
+  if(!S.dxf){ S.pendingDossier=d; toast('Dossier v'+d.version+' en attente : ouvrez le plan '+(d.plan||'DXF')); renderFiles(); return; }
+  if(d.plan && d.plan!==S.dxf.name) toast('Attention : ce dossier a été fait sur « '+d.plan+' »');
+  if(d.regles) Object.assign(S, {tol:d.regles.tol??S.tol, tolZ:d.regles.tolZ??S.tolZ, snap:d.regles.snap??S.snap, doubt:d.regles.doubt??S.doubt, dup:d.regles.dup??S.dup, axisMax:d.regles.axisMax??S.axisMax});
+  if(d.mode) { S.mode=d.mode==='3D'?'3D':'2D'; $('#m2d').setAttribute('aria-pressed',S.mode==='2D'); $('#m3d').setAttribute('aria-pressed',S.mode==='3D'); }
+  const c=d.codes||{}; S.codeLayers={...S.codeLayers,...(c.calques||{})}; S.codeMethod={...(c.methodes||{})}; S.codeRole={...(c.roles||{})}; S.codeZ={...(c.zConception||{})};
+  S.axes=(d.axes||[]).filter(a=>isFinite(a.x1)&&isFinite(a.y2));
+  S.pstate={...(d.points||{})}; S.dupKeep={...(d.doublonsGardes||{})};
+  if(d.rapport) S.rep={...S.rep,...d.rapport};
+  S.dossier={version:d.version||0, date:d.date, par:d.par, historique:d.historique||[]};
+  for(const lv of d.leves||[]){ const f=S.files.find(x=>x.name===lv.nom); if(f&&lv.ordre){ f.order=lv.ordre; f.orderFixed=true; } }
+  ALL=[]; buildAll(); recompute();
+  toast('Dossier v'+(d.version||'?')+' ouvert'+(d.par?' ('+d.par+')':''));
+}
+async function saveDossier(){
+  if(!S.dxf){ toast('Ouvrez d\'abord le plan DXF'); return; }
+  const d=dossierData();
+  const data=JSON.stringify(d,null,1);
+  const name='dossier_'+S.dxf.name.replace(/\.dxf$/i,'')+'.json';
+  const dl=await getDownloads();
+  let ok=false;
+  if(dl){ try{ await dl.save({filename:name,data}); ok=true; }catch(err){ if(err&&err.code==='declined') return; } }
+  if(!ok){ try{ await navigator.clipboard.writeText(data); ok=true; toast('Téléchargement indisponible : dossier copié dans le presse-papiers'); }catch(_){ toast('Enregistrement impossible ici'); return; } }
+  else toast('Dossier v'+d.version+' enregistré : '+name);
+  S.dossier={version:d.version,date:d.date,par:d.par,historique:d.historique}; persist(); renderFiles();
+}
+$('#bDosSave').onclick=saveDossier;
+$('#fDos').addEventListener('change',e=>{ if(e.target.files.length) addFiles([...e.target.files]); e.target.value=''; });
+
+function renderAxes(focusNew){
+  $('#nAxes').textContent=S.axes.length||'';
+  const el=$('#pane-axes');
+  if(!S.dxf){ el.innerHTML='<p class="help">Chargez un plan DXF pour identifier ses axes.</p>'; return; }
+  const cnt={}; for(const p of ALL) for(const id of p.axes) cnt[id]=(cnt[id]||0)+1;
+  const nSel=S.sel.size;
+  const lays=axisLayers();
+  let h=`<div class="sect"><h4>Axes de référence</h4>
+    <p class="help">Un point lié à un axe est rapporté en <b>PM</b> (chaînage le long de l'axe) et <b>EC</b> (distance perpendiculaire, + à droite dans le sens de l'axe), théorique vs mesuré. Les axes et les liens sont mémorisés pour ce plan dans ce navigateur.</p></div>
+    <div class="actions">
+      <button class="btn small" id="axDetect" title="Lit les bulles et lignes des calques ${esc(lays.join(', ')||'d\'axes')}">Détecter les axes du plan</button>
+      <button class="btn small" id="axPick" aria-pressed="${S.pickAxis}">${S.pickAxis?'Cliquez une ligne du plan…':'Ajouter un axe (clic sur une ligne)'}</button>
+      <button class="btn small" id="axShow" aria-pressed="${S.showAxes!==false}">Afficher les axes</button>
+    </div>
+    <div class="sect"><h4>Lier aux axes proches</h4>
+      <div class="mini">Distance max. <input type="number" id="axMax" step="0.5" min="0" value="${S.axisMax}" style="width:80px"> m</div>
+      <p class="help" style="margin:6px 0">Lie chaque point à l'axe le plus proche dans chaque direction (au plus deux axes). Vous pouvez aussi sélectionner un point puis cliquer un axe sur le plan.</p>
+      <div class="actions"><button class="btn small" id="axAutoSel" ${nSel?'':'disabled'}>Points sélectionnés (${nSel})</button><button class="btn small" id="axAutoRep">Points du rapport (${ALL.filter(p=>p.rep).length})</button><button class="btn small" id="axClear" ${nSel?'':'disabled'}>Délier la sélection</button></div>
+    </div>
+    <div class="axlist">`;
+  for(const a of S.axes){
+    const g=axGeom(a);
+    h+=`<div class="axrow ${S.axisSel===a.id?'on':''}" data-ax="${a.id}">
+      <input type="text" value="${esc(a.name)}" data-axname="${a.id}" aria-label="Nom de l'axe">
+      <span class="meta" title="Gisement dans le sens de l'axe · longueur · points liés">${gisement(a)} · ${g.len.toFixed(1)} m · ${cnt[a.id]||0} pts</span>
+      <button data-axrev="${a.id}" title="Inverser le sens (change le signe de l'EC et l'origine du PM)">⇄</button>
+      <button data-axdel="${a.id}" title="Supprimer l'axe">×</button></div>`;
+  }
+  if(!S.axes.length) h+=`<p class="help">${lays.length?'Aucun axe pour le moment : lancez la détection ou ajoutez-les à la main.':'Aucun calque d\'axes reconnu (AXE, GRID…) : ajoutez les axes en cliquant leurs lignes sur le plan.'}</p>`;
+  h+=`</div>
+    <div class="actions"><button class="btn small" id="axExport" ${S.axes.length?'':'disabled'}>Exporter les axes (.json)</button><label class="btn small"><input type="file" id="axImport" accept=".json" class="sr">Importer des axes…</label></div>`;
+  el.innerHTML=h;
+  if(focusNew){ const i=el.querySelector(`[data-axname="${S.axisSel}"]`); if(i){ i.focus(); i.select(); } }
+}
+$('#pane-axes').addEventListener('click',async e=>{
+  const t=e.target.closest('button,.axrow'); if(!t) return;
+  if(t.id==='axDetect'){ const n=detectAxes(); toast(n? n+' axes détectés' : 'Aucun axe détecté : ajoutez-les en cliquant leurs lignes'); recompute(); return; }
+  if(t.id==='axPick'){ S.pickAxis=!S.pickAxis; renderAxes(); if(S.pickAxis) toast('Cliquez une ligne d\'axe sur le plan'); return; }
+  if(t.id==='axShow'){ S.showAxes = S.showAxes===false; renderAxes(); draw(); return; }
+  if(t.id==='axAutoSel'||t.id==='axAutoRep'){
+    const pts = t.id==='axAutoSel' ? ALL.filter(p=>S.sel.has(p.uid)) : ALL.filter(p=>p.rep);
+    let n=0; for(const p of pts){ const ids=autoAxes(p,S.axisMax); if(ids.length){ p.axes=ids; n++; } }
+    toast(n+' point(s) liés aux axes'); recompute(); return;
+  }
+  if(t.id==='axClear'){ for(const p of ALL) if(S.sel.has(p.uid)) p.axes=[]; recompute(); return; }
+  if(t.id==='axExport'){
+    const data=JSON.stringify({plan:S.dxf.name, axes:S.axes.map(({id,name,x1,y1,x2,y2})=>({id,name,x1,y1,x2,y2}))},null,1);
+    const dl=await getDownloads(); if(dl){ try{ await dl.save({filename:'axes_'+S.dxf.name.replace(/\.dxf$/i,'')+'.json',data}); toast('Axes exportés'); }catch(err){ if(err&&err.code!=='declined') copyText(data,'Axes copiés dans le presse-papiers'); } } else copyText(data,'Axes copiés dans le presse-papiers');
+    return;
+  }
+  if(t.dataset.axrev){ const a=axisById(t.dataset.axrev); [a.x1,a.y1,a.x2,a.y2]=[a.x2,a.y2,a.x1,a.y1]; recompute(); return; }
+  if(t.dataset.axdel){ S.axes=S.axes.filter(a=>a.id!==t.dataset.axdel); if(S.axisSel===t.dataset.axdel) S.axisSel=null; recompute(); return; }
+  if(t.classList.contains('axrow') && !e.target.matches('input')){ const a=axisById(t.dataset.ax); S.axisSel = S.axisSel===a.id? null : a.id; if(S.axisSel){ const g=axGeom(a); V.cx=(g.x1+g.x2)/2; V.cy=(g.y1+g.y2)/2; V.s=Math.min(V.s, (Math.min(V.W,V.H)-60)/g.len*1.6); } renderAxes(); draw(); }
+});
+$('#pane-axes').addEventListener('change',async e=>{
+  const t=e.target;
+  if(t.dataset.axname){ const a=axisById(t.dataset.axname); a.name=t.value.trim()||a.name; recompute(); }
+  if(t.id==='axMax'){ const v=parseFloat(t.value); if(v>0) S.axisMax=v; }
+  if(t.id==='axImport' && t.files.length){
+    try{ const j=JSON.parse(await readFile(t.files[0])); const arr=(j.axes||j).filter(a=>a&&a.name!=null&&isFinite(a.x1)); let n=0; for(const a of arr){ const ax={id:a.id||('a'+Math.random().toString(36).slice(2,8)),name:String(a.name),x1:+a.x1,y1:+a.y1,x2:+a.x2,y2:+a.y2,manual:true}; if(!S.axes.some(b=>sameLine(b,ax))){ S.axes.push(ax); n++; } } toast(n+' axe(s) importé(s)'); recompute(); }
+    catch(err){ toast('Fichier d\'axes illisible'); }
+    t.value='';
+  }
+});
+async function getDownloads(){ try{ return await window.claude?.use?.('downloads'); }catch(_){ return null; } }
+async function copyText(s,msg){ try{ await navigator.clipboard.writeText(s); toast(msg); }catch(_){ toast('Copie impossible ici'); } }
+
+function renderLayers(){
+  if(!S.dxf){ $('#pane-layers').innerHTML='<p class="help">Aucun plan chargé.</p>'; $('#nLays').textContent=''; return; }
+  const ls=Object.values(S.dxf.layers).filter(l=>l.segs.length||l.verts.length||l.texts.length).sort((a,b)=>a.name.localeCompare(b.name));
+  $('#nLays').textContent=ls.length;
+  const used=new Set(); for(const c in S.codeLayers) for(const n of S.codeLayers[c]) used.add(n);
+  let h=`<div class="actions"><button class="btn small" data-lall="1">Tout afficher</button><button class="btn small" data-lall="used">Seulement les calques associés</button></div><div class="laylist">`;
+  for(const l of ls){ h+=`<label><input type="checkbox" data-lon="${esc(l.name)}" ${S.layerOn[l.name]!==false?'checked':''}>${esc(l.name)}<span class="meta">${used.has(l.name)?'associé · ':''}${l.has3D?'3D · ':''}${(l.segs.length/6)|0} seg. · ${(l.verts.length/3)|0} sommets</span></label>`; }
+  h+='</div>';
+  $('#pane-layers').innerHTML=h;
+}
+$('#pane-layers').addEventListener('change',e=>{ const t=e.target; if(t.dataset.lon!=null){ S.layerOn[t.dataset.lon]=t.checked; draw(); } });
+$('#pane-layers').addEventListener('click',e=>{ const b=e.target.closest('[data-lall]'); if(!b) return; const used=new Set(); for(const c in S.codeLayers) for(const n of S.codeLayers[c]) used.add(n); for(const n in S.dxf.layers) S.layerOn[n]= b.dataset.lall==='1' ? true : used.has(n); renderLayers(); draw(); });
+
+function renderDetail(){
+  const el=$('#detail'); const sel=ALL.filter(p=>S.sel.has(p.uid));
+  if(!sel.length){ el.hidden=true; return; }
+  el.hidden=false;
+  const lnames=S.dxf?Object.keys(S.dxf.layers).filter(n=>{const l=S.dxf.layers[n];return l.segs.length||l.verts.length}).sort():[];
+  if(sel.length>1){
+    const c={}; sel.forEach(p=>c[p.status]=(c[p.status]||0)+1);
+    el.innerHTML=`<h3>${sel.length} points sélectionnés</h3><div style="display:flex;gap:4px;flex-wrap:wrap">${Object.entries(c).map(([k,v])=>`${pill(k)} <span class="mono" style="font-size:12px">${v}</span>`).join(' ')}</div>
+      <div class="actions"><button class="btn small" data-bulk="out">Exclure</button><button class="btn small" data-bulk="in">Inclure</button><button class="btn small" data-bulk="reset">Rétablir l'automatique</button><button class="btn small" data-bulk="clear">Désélectionner</button></div>
+      <div class="actions"><button class="btn small primary" data-bulk="rep1">Ajouter au rapport</button><button class="btn small" data-bulk="rep0">Retirer du rapport</button>${S.axes.length?'<button class="btn small" data-bulk="axauto">Lier aux axes proches</button>':''}</div>
+      <div class="ctl"><label for="bulkMeth">Méthode</label><select id="bulkMeth"><option value="">—</option><option value="code">Selon le code</option><option value="auto">Auto</option><option value="vertex">Sommet</option><option value="line">Ligne (EC)</option><option value="ignore">Ignorer</option></select>
+      <label for="bulkRole">Rôle</label><select id="bulkRole"><option value="">—</option><option value="code">Selon le code</option>${Object.entries(ROLE_LBL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
+      <label for="bulkLay">Calque</label><select id="bulkLay"><option value="">—</option><option value="code">Selon le code</option>${lnames.map(l=>`<option>${esc(l)}</option>`).join('')}</select></div>`;
+    return;
+  }
+  const p=sel[0], r=p.res;
+  const is3D=S.mode==='3D';
+  let h=`<h3><span class="mono">${esc(p.id)}</span> ${pill(p.status)} ${p.dupGroup?'<span class="pill dup">doublon</span>':''}<button class="btn small" data-close style="margin-left:auto" aria-label="Fermer">×</button></h3>
+    <div style="font-size:12.5px;color:var(--ink-2)">${esc(p.desc)||'<i>sans description</i>'} · ${esc(p.file)}</div>
+    <dl class="kv"><dt>E</dt><dd>${f3(p.E)}</dd><dt>N</dt><dd>${f3(p.N)}</dd><dt>Z</dt><dd>${f3(p.Z)}</dd><dt>${r?'Calque':''}</dt><dd style="font-size:11px;overflow:hidden;text-overflow:ellipsis">${r?esc(r.layer):''}</dd>`;
+  if(r){ h+=`<dt>ΔE</dt><dd>${smm(r.dE)} mm</dd><dt>ΔN</dt><dd>${smm(r.dN)} mm</dd><dt>Écart</dt><dd><b>${mm(r.d)} mm</b></dd><dt>${r.kind==='line'?'EC':'Méth.'}</dt><dd>${r.kind==='line'?smm(r.ec)+' mm':'Sommet'}</dd>`;
+    if(is3D) h+=`<dt>Z théo</dt><dd>${r.zth!=null?f3(r.zth):'—'}</dd><dt>ΔZ</dt><dd>${r.dZ!=null?smm(r.dZ)+' mm':(r.zth==null?'pas de Z théo':'—')}</dd>`; }
+  h+=`</dl>`;
+  h+=`<label class="mini"><input type="checkbox" id="dRep" ${p.rep?'checked':''}> Inclure ce point au rapport d'implantation</label>`;
+  if(S.axes.length){
+    const near=nearAxes(p,null).slice(0,6); const ids=new Set(near.map(o=>o.a.id)); for(const id of p.axes) if(!ids.has(id)) near.unshift({a:axisById(id),d:Math.abs(axDist(p,axisById(id)).ec)});
+    h+=`<div><div style="font-size:12px;color:var(--ink-2);margin-bottom:4px">Axes de référence <span style="color:var(--ink-3)">(touchez pour lier ; distance au point)</span></div><div class="axchips">${near.map(o=>`<button class="axchip" data-tax="${o.a.id}" aria-pressed="${p.axes.includes(o.a.id)}">${esc(o.a.name)}<small>${o.d.toFixed(2)} m</small></button>`).join('')||'<span class="help">Aucun axe à proximité</span>'}</div></div>`;
+    if(p.axRes.length) h+=`<div class="axres">${p.axRes.map(a=>`<span>Axe ${esc(a.name)}</span><span>PM ${f3r(a.pm)} · EC théo ${f3r(a.ot)} · mes. ${f3r(a.om)} · <b>Δ ${a.d!=null?smm(a.d)+' mm':'—'}</b></span>`).join('')}</div>`;
+    else h+=`<div style="font-size:12px;color:var(--ink-3)">Sans axe : la référence est ${r?(r.kind==='line'?'la ligne':'le sommet')+' du calque '+esc(r.layer):'absente'}.</div>`;
+  }
+  if(p.ex) h+=`<div style="font-size:12.5px;color:var(--ink-2)">Exclu : ${esc(p.exMode==='out'?'manuellement':p.autoEx)}</div>`;
+  if(p.dupGroup){ h+=`<div style="font-size:12.5px"><b>Mesures multiples :</b> ${p.dupMembers.map(q=>`<button class="btn small" data-keep="${esc(q.uid)}" ${q.ex?'':'aria-pressed="true"'} title="Garder ce point">${esc(q.id)} · ${q.res?mm(q.res.d)+' mm':''}</button>`).join(' ')}</div>`; }
+  h+=`<div class="ctl">
+    <label for="dRole">Rôle</label><select id="dRole"><option value="">Selon le code (${ROLE_LBL[S.codeRole[p.code]||autoRole(p)]})</option>${Object.entries(ROLE_LBL).map(([k,v])=>`<option value="${k}" ${p.role===k?'selected':''}>${v}</option>`).join('')}</select>
+    <label for="dEx">Prise en compte</label><select id="dEx"><option value="auto" ${p.exMode==null?'selected':''}>Automatique</option><option value="in" ${p.exMode==='in'?'selected':''}>Inclure</option><option value="out" ${p.exMode==='out'?'selected':''}>Exclure</option></select>
+    <label for="dMeth">Méthode</label><select id="dMeth"><option value="" ${!p.method?'selected':''}>Selon le code (${METH_LBL[S.codeMethod[p.code]||'auto']})</option>${['auto','vertex','line','ignore'].map(m=>`<option value="${m}" ${p.method===m?'selected':''}>${METH_LBL[m]}</option>`).join('')}</select>
+    <label for="dLay">Calque</label><select id="dLay"><option value="">Selon le code</option>${lnames.map(l=>`<option ${p.layer===l?'selected':''}>${esc(l)}</option>`).join('')}</select>
+    <label for="dNote">Remarque</label><input type="text" id="dNote" value="${esc(p.note)}" placeholder="ex. repris après ajustement">
+  </div>`;
+  el.innerHTML=h;
+}
+$('#detail').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.close!=null){ S.sel.clear(); refreshSel(); return; }
+  if(b.dataset.tax){ const p=ALL.find(q=>S.sel.has(q.uid)); const id=b.dataset.tax; p.axes = p.axes.includes(id) ? p.axes.filter(i=>i!==id) : [...p.axes,id]; recompute(); return; }
+  if(b.dataset.bulk==='rep1'||b.dataset.bulk==='rep0'){ for(const p of ALL) if(S.sel.has(p.uid)) p.rep=b.dataset.bulk==='rep1'; toast(b.dataset.bulk==='rep1'?'Ajoutés au rapport':'Retirés du rapport'); recompute(); return; }
+  if(b.dataset.bulk==='axauto'){ let n=0; for(const p of ALL) if(S.sel.has(p.uid)){ const ids=autoAxes(p,S.axisMax); if(ids.length){p.axes=ids;n++;} } toast(n+' point(s) liés aux axes'); recompute(); return; }
+  if(b.dataset.keep){ const p=ALL.find(q=>q.uid===b.dataset.keep); S.dupKeep[p.dupGroup]=p.uid; for(const q of p.dupMembers) q.exMode=null; recompute(); return; }
+  if(b.dataset.bulk){ const m=b.dataset.bulk; if(m==='clear'){ S.sel.clear(); refreshSel(); return; } for(const p of ALL) if(S.sel.has(p.uid)){ if(m==='reset'){p.exMode=null;p.method=null;p.layer=null;} else p.exMode=m; } recompute(); }
+});
+$('#detail').addEventListener('change',e=>{
+  const t=e.target; const sel=ALL.filter(p=>S.sel.has(p.uid));
+  if(t.id==='dEx'){ sel[0].exMode= t.value==='auto'?null:t.value; recompute(); }
+  if(t.id==='dRole'){ sel[0].role=t.value||null; recompute(); }
+  if(t.id==='bulkRole' && t.value){ for(const p of sel) p.role= t.value==='code'?null:t.value; recompute(); }
+  if(t.id==='dMeth'){ sel[0].method=t.value||null; recompute(); }
+  if(t.id==='dLay'){ sel[0].layer=t.value||null; recompute(); }
+  if(t.id==='dNote'){ sel[0].note=t.value; persist(); }
+  if(t.id==='dRep'){ sel[0].rep=t.checked; recompute(); }
+  if(t.id==='bulkMeth' && t.value){ for(const p of sel) p.method= t.value==='code'?null:t.value; recompute(); }
+  if(t.id==='bulkLay' && t.value){ for(const p of sel) p.layer= t.value==='code'?null:t.value; recompute(); }
+});
+
+/* ============================================================
+   Chargement des fichiers
+   ============================================================ */
+function readFile(f){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsText(f,'utf-8'); }); }
+async function addFiles(list){
+  let dxfLoaded=false, ptsLoaded=0;
+  if(S.example){ S.example=false; S.dxf=null; S.files=[]; S.codeLayers={}; S.codeMethod={}; S.dupKeep={}; S.axes=[]; S.pstate={}; ALL=[]; if(S.rep.projet==='Exemple – bâtiment fictif') S.rep.projet=''; }
+  const rank=f=>/\.dxf$/i.test(f.name)?0:/\.json$/i.test(f.name)?1:2;
+  list=[...list].sort((a,b)=>rank(a)-rank(b));
+  let dos=null;
+  for(const f of list){
+    const txt=await readFile(f);
+    if(/\.json$/i.test(f.name)){ try{ dos=JSON.parse(txt); }catch(_){ toast(f.name+' : JSON illisible'); } continue; }
+    if(/\.dxf$/i.test(f.name) || /^\s*0\s*[\r\n]+\s*SECTION/.test(txt.slice(0,200))){
+      try{ S.dxf=parseDXF(txt,f.name); S.layerOn={}; dxfLoaded=true; S.axisSel=null; S.dossier=null; if(S.pendingDossier){ dos=dos||S.pendingDossier; S.pendingDossier=null; } else if(!loadProject()) detectAxes(); }catch(err){ toast('Lecture du DXF impossible : '+err.message); }
+    } else { const pf=parsePoints(txt,f.name); if(pf.pts.length){ S.files.push(pf); ptsLoaded++; } else toast(f.name+' : aucun point reconnu (attendu : P,N,E,Z,D)'); }
+  }
+  detectOrder(); buildAll(); autoMap(); recompute();
+  if(dos){ try{ applyDossier(dos); }catch(_){ toast('Ce fichier n\'est pas un dossier d\'implantation'); } }
+  fit();
+  if(dos) {} else if(dxfLoaded) toast('Plan chargé : '+Object.keys(S.dxf.layers).length+' calques · '+S.axes.length+' axes');
+  else if(ptsLoaded) toast(ptsLoaded+' fichier(s) de points ajouté(s)');
+}
+$('#fDxf').addEventListener('change',e=>{ if(e.target.files.length) addFiles([...e.target.files]); e.target.value=''; });
+$('#fPts').addEventListener('change',e=>{ if(e.target.files.length) addFiles([...e.target.files]); e.target.value=''; });
+let dragDepth=0;
+window.addEventListener('dragenter',e=>{ if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){ dragDepth++; $('#drop').hidden=false; } });
+window.addEventListener('dragleave',()=>{ dragDepth=Math.max(0,dragDepth-1); if(!dragDepth) $('#drop').hidden=true; });
+window.addEventListener('dragover',e=>e.preventDefault());
+window.addEventListener('drop',e=>{ e.preventDefault(); dragDepth=0; $('#drop').hidden=true; if(e.dataTransfer.files.length) addFiles([...e.dataTransfer.files]); });
+
+/* ============================================================
+   Barre d'outils, onglets, mode 2D/3D
+   ============================================================ */
+document.querySelector('.tabs').addEventListener('click',e=>{ const t=e.target.closest('.tab'); if(!t) return; S.tab=t.dataset.tab; for(const b of document.querySelectorAll('.tab')) b.setAttribute('aria-selected', b===t); for(const n of ['codes','points','axes','report','layers']) $('#pane-'+n).hidden = n!==S.tab; store('tab',S.tab); });
+function setMode(m){ S.mode=m; $('#m2d').setAttribute('aria-pressed',m==='2D'); $('#m3d').setAttribute('aria-pressed',m==='3D'); store('mode',m); recompute(); }
+$('#m2d').onclick=()=>setMode('2D'); $('#m3d').onclick=()=>setMode('3D');
+$('#bFit').onclick=()=>fit();
+$('#bBox').onclick=()=>{ S.boxMode=!S.boxMode; $('#bBox').setAttribute('aria-pressed',S.boxMode); };
+$('#bVec').onclick=()=>{ S.vec=!S.vec; $('#bVec').setAttribute('aria-pressed',S.vec); draw(); };
+$('#bLbl').onclick=()=>{ S.labels=!S.labels; $('#bLbl').setAttribute('aria-pressed',S.labels); draw(); };
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ S.sel.clear(); refreshSel(); } });
+new ResizeObserver(resize).observe(wrap);
+try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw); }catch(_){}
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+/* ============================================================
+   Exemple fictif (bâtiment 3 × 4 axes, colonnes, semelles, mur)
+   ============================================================ */
+function makeExample(){
+  let seed=7; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+  const gauss=()=>{ let u=0,v=0; while(!u)u=rnd(); while(!v)v=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); };
+  const E0=312480, N0=5046210, rot=28*Math.PI/180, cr=Math.cos(rot), sr=Math.sin(rot);
+  const W=(u,v)=>[E0+u*cr-v*sr, N0+u*sr+v*cr];
+  const dx=['1','2','3','4'], dy=['A','B','C'], sx=7.5, sy=6.0;
+  const D=['0','SECTION','2','TABLES','0','TABLE','2','LAYER'];
+  for(const [n,c] of [['DWG-TH-BTM-AXES',1],['DWG-TH-BTM-SEMELLES',3],['DWG-TH-BTM-MUR',4],['S-COLS-HDLN',5],['A-ANNO',8]]) D.push('0','LAYER','2',n,'62',String(c));
+  D.push('0','ENDTAB','0','ENDSEC','0','SECTION','2','ENTITIES');
+  const line=(l,a,b)=>D.push('0','LINE','8',l,'10',a[0].toFixed(4),'20',a[1].toFixed(4),'30','0','11',b[0].toFixed(4),'21',b[1].toFixed(4),'31','0');
+  const poly=(l,pts)=>{ D.push('0','LWPOLYLINE','8',l,'90',String(pts.length),'70','1'); for(const p of pts) D.push('10',p[0].toFixed(4),'20',p[1].toFixed(4)); };
+  const text=(l,p,h,s)=>D.push('0','TEXT','8',l,'10',p[0].toFixed(3),'20',p[1].toFixed(3),'40',String(h),'1',s);
+  const sq=(u,v,h)=>[W(u-h,v-h),W(u+h,v-h),W(u+h,v+h),W(u-h,v+h)];
+  const bub=(p,s)=>{ D.push('0','CIRCLE','8','DWG-TH-BTM-AXES','10',p[0].toFixed(4),'20',p[1].toFixed(4),'40','0.5'); D.push('0','TEXT','8','DWG-TH-BTM-AXES','10',p[0].toFixed(3),'20',p[1].toFixed(3),'11',p[0].toFixed(3),'21',p[1].toFixed(3),'40','0.4','72','1','73','2','1',s); };
+  for(let i=0;i<4;i++){ line('DWG-TH-BTM-AXES',W(i*sx,-3),W(i*sx,2*sy+3)); bub(W(i*sx,-3.5),dx[i]); bub(W(i*sx,2*sy+3.5),dx[i]); }
+  for(let j=0;j<3;j++){ line('DWG-TH-BTM-AXES',W(-3,j*sy),W(3*sx+3,j*sy)); bub(W(-3.5,j*sy),dy[j]); bub(W(3*sx+3.5,j*sy),dy[j]); }
+  const cols=[]; for(let i=0;i<4;i++)for(let j=0;j<3;j++){ poly('DWG-TH-BTM-SEMELLES',sq(i*sx,j*sy,0.9)); poly('S-COLS-HDLN',sq(i*sx,j*sy,0.25)); cols.push([i,j]); text('A-ANNO',W(i*sx+0.35,j*sy+0.35),0.25,'P-'+dx[i]+dy[j]); }
+  line('DWG-TH-BTM-MUR',W(-0.15,2*sy+0.15),W(3*sx+0.15,2*sy+0.15)); line('DWG-TH-BTM-MUR',W(-0.15,2*sy+0.45),W(3*sx+0.15,2*sy+0.45));
+  D.push('0','ENDSEC','0','EOF');
+  // points
+  const P=[]; let id=5001; const r3=v=>v.toFixed(3);
+  const add=(pid,u,v,z,desc,err)=>{ const [e,n]=W(u+(err?err[0]:gauss()*0.002), v+(err?err[1]:gauss()*0.002)); P.push([pid,r3(n),r3(e),z==null?'':r3(z),desc].join(',')); };
+  const st=W(-8,-6); P.push(['ST1',r3(st[1]),r3(st[0]),'101.512',''].join(','));
+  add('1',-6,20,100.204,'CIBLE',[0,0]); add('2',30,-5,100.881,'CIBLE',[0,0]);
+  const corners=[[-1,-1],[1,-1],[1,1],[-1,1]];
+  cols.forEach(([i,j],ci)=>{
+    corners.forEach(([a,b],k)=>{
+      const u=i*sx+a*0.25, v=j*sy+b*0.25; let err=null;
+      if(ci===4&&k===1) err=[0.009,-0.007];
+      if(ci===7&&k===2) err=[0.002,0.016];
+      if(ci===10&&k===0){ add(String(id++),u,v,98.402+gauss()*0.002,'SCOLSHDL 1'+(3400+ci*4+k),[0.019,0.011]); err=[0.001,-0.002]; }
+      add(String(id++),u,v,98.400+gauss()*0.003,'SCOLSHDL 1'+(3400+ci*4+k),err);
+    });
+  });
+  cols.forEach(([i,j],ci)=>{ if(ci%3) return; add(String(id++),i*sx+0.9,j*sy+(rnd()-0.5)*1.2,97.600+gauss()*0.003,'DWGTHBTM 2'+(200+ci)); add(String(id++),i*sx+(rnd()-0.5)*1.2,j*sy-0.9,97.600+gauss()*0.003,'DWGTHBTM 2'+(300+ci)); });
+  add(String(id++),5,2*sy+0.15,98.000,'DWGTHBTM 2410'); add(String(id++),12,2*sy+0.15,98.000,'DWGTHBTM 2411',[0,0.013]); add(String(id++),18,2*sy+0.45,98.000,'DWGTHBTM 2412');
+  add(String(id++),2*sx+0.25,sy+0.25,98.4,'SCOLSHDL 13999',[0.21,-0.27]);
+  add('3',-6,20,100.205,'fermeture',[0.001,0]);
+  return {dxf:D.join('\n'), pts:P.join('\n')};
+}
+function loadExample(){
+  const ex=makeExample();
+  S.dxf=parseDXF(ex.dxf,'Exemple_batiment_fictif.dxf'); S.files=[parsePoints(ex.pts,'Exemple_leve_colonnes.txt')];
+  S.example=true; S.axes=[]; detectAxes(); detectOrder(); buildAll(); autoMap(); analyse();
+  // état de démonstration : quelques colonnes au rapport, liées à leurs axes
+  for(const p of ALL){ if(p.code==='SCOLSHDL' && +p.id>=5017 && +p.id<=5032){ p.rep=true; p.axes=autoAxes(p,1.5); } }
+  S.rep={...S.rep, projet:S.rep.projet||'Exemple – bâtiment fictif'};
+  recompute(); fit();
+}
+
+/* ============================================================
+   Démarrage
+   ============================================================ */
+(function init(){
+  const r=load('rules',null); if(r) Object.assign(S,r);
+  const rp=load('rep',null); if(rp) S.rep={...S.rep,...rp};
+  const m=load('mode','2D'); S.mode=m==='3D'?'3D':'2D'; $('#m2d').setAttribute('aria-pressed',S.mode==='2D'); $('#m3d').setAttribute('aria-pressed',S.mode==='3D');
+  const t=load('tab','codes'); const tb=document.querySelector(`.tab[data-tab="${t}"]`); if(tb) tb.click();
+  const rr=wrap.getBoundingClientRect(); V.W=rr.width; V.H=rr.height;
+  loadExample();
+})();
+</script>
+
+</body></html>
