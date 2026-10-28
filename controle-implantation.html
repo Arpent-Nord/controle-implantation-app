@@ -200,7 +200,7 @@ td.chk,th.chk{width:28px;text-align:center;padding-inline:4px}
     <img class="an-logo" id="anLogo" alt="Arpent-Nord construction" width="57" height="46"><img class="mt-logo" id="mtLogo" alt="MECATECH Arpentage" width="78" height="46">
     <div class="brand">
       <h1>Contrôle d'implantation</h1>
-      <span>Points levés comparés au plan DXF · écarts par élément · <span title="Version de l'application">v2.3 (2026-10-27)</span></span>
+      <span>Points levés comparés au plan DXF ou LandXML · écarts par élément · PM / EC · <span title="Version de l'application">v2.4 (2026-10-28)</span></span>
     </div>
     <div class="seg" role="group" aria-label="Mode de traitement">
       <button id="m2d" aria-pressed="true" title="Contrôle planimétrique (E, N)">2D</button>
@@ -208,6 +208,7 @@ td.chk,th.chk{width:28px;text-align:center;padding-inline:4px}
     </div>
     <button class="btn" id="bMandat" title="Ouvrir le plan, les levés et le dossier directement dans les dossiers du contrat (Chrome ou Edge)">Mandat…</button>
     <label class="btn"><input type="file" id="fDxf" accept=".dxf" class="sr">Plan DXF…</label>
+    <label class="btn" title="Alignement, profil et surface TIN exportés de Civil 3D (LandXML)"><input type="file" id="fLx" accept=".xml,.landxml" multiple class="sr">Route LandXML…</label>
     <label class="btn primary"><input type="file" id="fPts" accept=".txt,.csv,.xyz,.asc,.pts" multiple class="sr">Points levés…</label>
     <label class="btn" title="Ouvrir un dossier d'implantation partagé (.json)"><input type="file" id="fDos" accept=".json" class="sr">Ouvrir un dossier…</label>
     <button class="btn" id="bDosSave" title="Enregistre axes, codes, rôles, liens et choix du rapport dans un fichier .json versionné">Enregistrer le dossier</button>
@@ -234,7 +235,7 @@ td.chk,th.chk{width:28px;text-align:center;padding-inline:4px}
       <div class="coords" id="coords">—</div>
       <div class="scalebar" id="scalebar"></div>
       <div class="detail" id="detail" hidden></div>
-      <div class="drop" id="drop" hidden>Déposez le DXF, les fichiers de points et/ou le dossier (.json)</div>
+      <div class="drop" id="drop" hidden>Déposez le DXF, le LandXML (.xml), les fichiers de points et/ou le dossier (.json)</div>
     </div>
     <section class="panel" aria-label="Analyse">
       <div class="tabs" role="tablist">
@@ -443,6 +444,212 @@ function parseDXF(text, name){
 function gv(g,code,def){ for(const [c,v] of g) if(c===code) return typeof v==='string'?v.trim():v; return def; }
 
 /* ============================================================
+   Route LandXML (Civil 3D) : alignements (droites, arcs, spirales),
+   profils en long (PIV + courbes) et surfaces TIN.
+   LandXML écrit les coordonnées Nord, Est (inverse du DXF).
+   ============================================================ */
+const LXP='XML·';
+S.lx=[];              // fichiers LandXML : {name, aligns:[], surfs:[], warn:[]}, coordonnées absolues (E,N)
+S.codeEC={};          // code -> EC prévu (m, + à droite) par rapport à un alignement
+function fmtPM(s){ if(s==null||!isFinite(s)) return '—'; const neg=s<0; s=Math.abs(s)+5e-7; const km=Math.floor(s/1000); const m=s-km*1000; return (neg?'-':'')+km+'+'+m.toFixed(3).padStart(7,'0'); }
+function parseLandXML(text,name){
+  const doc=new DOMParser().parseFromString(text,'application/xml');
+  if(doc.getElementsByTagName('parsererror').length) throw new Error('XML illisible');
+  const root=doc.documentElement; if(!/^LandXML$/i.test(root.localName)) throw new Error('ce n\'est pas un fichier LandXML');
+  const kid=(el,tag)=>el?[...el.children].find(c=>c.localName===tag):null;
+  const kids=(el,tag)=>el?[...el.children].filter(c=>c.localName===tag):[];
+  const all=(el,tag)=>[...el.getElementsByTagNameNS('*',tag)];
+  const warn=[];
+  const un=all(root,'Units')[0], imp=kid(un,'Imperial'), met=kid(un,'Metric');
+  let k=1;
+  if(imp){ const lu=(imp.getAttribute('linearUnit')||'').toLowerCase(); k = lu.includes('ussurvey')? 1200/3937 : 0.3048; warn.push('Unités impériales converties en mètres'); }
+  else if(met){ const lu=(met.getAttribute('linearUnit')||'meter').toLowerCase(); if(lu.startsWith('milli')) k=0.001; else if(lu.startsWith('centi')) k=0.01; else if(lu.startsWith('kilo')) k=1000; }
+  const nums=el=>el? el.textContent.trim().split(/[\s,]+/).filter(Boolean).map(Number) : null;
+  const EN=el=>{ const v=nums(el); return v&&v.length>=2&&isFinite(v[0])&&isFinite(v[1]) ? [v[1]*k, v[0]*k] : null; };
+  const num=(el,a)=>{ const v=el.getAttribute(a); if(v==null||v==='') return null; if(/^inf/i.test(v)) return Infinity; const n=+v; return isFinite(n)?n:null; };
+  // ---- alignements
+  const aligns=[];
+  for(const al of all(root,'Alignment')){
+    const nm=al.getAttribute('name')||('Alignement '+(aligns.length+1));
+    const cg=kid(al,'CoordGeom'); if(!cg){ warn.push(nm+' : aucune géométrie en plan'); continue; }
+    const sta0=(num(al,'staStart')||0)*k;
+    const els=[]; let s=0, lastDir=null;
+    for(const g of cg.children){
+      const t=g.localName; const A=EN(kid(g,'Start')), B=EN(kid(g,'End'));
+      if(!A||!B){ warn.push(nm+' : élément '+t+' sans début ni fin, ignoré'); continue; }
+      if(t==='Line'){ const len=Math.hypot(B[0]-A[0],B[1]-A[1]); if(len<1e-9) continue; els.push({t:'L',A,B,len,s0:s}); s+=len; lastDir=Math.atan2(B[1]-A[1],B[0]-A[0]); }
+      else if(t==='Curve'){
+        let C=EN(kid(g,'Center')); const rot=(g.getAttribute('rot')||'ccw').toLowerCase()==='cw'?-1:1;
+        if(!C){ const R=(num(g,'radius')||0)*k; const ch=Math.hypot(B[0]-A[0],B[1]-A[1]); if(!(R>=ch/2)){ warn.push(nm+' : arc sans centre ignoré'); continue; } const mx=(A[0]+B[0])/2, my=(A[1]+B[1])/2, h=Math.sqrt(R*R-ch*ch/4), ux=(B[0]-A[0])/ch, uy=(B[1]-A[1])/ch; C=[mx-uy*h*rot, my+ux*h*rot]; }
+        const r=Math.hypot(A[0]-C[0],A[1]-C[1]);
+        const a0=Math.atan2(A[1]-C[1],A[0]-C[0]), a1=Math.atan2(B[1]-C[1],B[0]-C[0]);
+        let da=(a1-a0)*rot; while(da<=1e-12) da+=2*Math.PI; while(da>2*Math.PI) da-=2*Math.PI;
+        const dl=num(g,'delta'); if(dl!=null && dl>180 && da<Math.PI) da=2*Math.PI-da;
+        const len=r*da; els.push({t:'A',A,B,C,r,rot,a0,da,len,s0:s}); s+=len; lastDir=a0+rot*(da+Math.PI/2);
+      }
+      else if(t==='Spiral'){
+        const L=(num(g,'length')||0)*k; if(!(L>0)){ warn.push(nm+' : spirale sans longueur ignorée'); continue; }
+        const rot=(g.getAttribute('rot')||'ccw').toLowerCase()==='cw'?-1:1;
+        const R0=num(g,'radiusStart'), R1=num(g,'radiusEnd');
+        const k0=(R0&&isFinite(R0))?rot/(R0*k):0, k1=(R1&&isFinite(R1))?rot/(R1*k):0;
+        const st=(g.getAttribute('spiType')||'clothoid').toLowerCase(); if(st!=='clothoid') warn.push(nm+' : spirale « '+st+' » calculée comme une clothoïde');
+        const PI=EN(kid(g,'PI'));
+        let th0 = PI ? Math.atan2(PI[1]-A[1],PI[0]-A[0]) : lastDir;
+        if(th0==null){ warn.push(nm+' : direction de départ de la spirale inconnue'); continue; }
+        const n=Math.max(40,Math.ceil(L/0.05)), h=L/n; const P=[[A[0],A[1]]]; let x=A[0],y=A[1];
+        for(let i=0;i<n;i++){ const sm=(i+0.5)*h, th=th0+k0*sm+(k1-k0)*sm*sm/(2*L); x+=h*Math.cos(th); y+=h*Math.sin(th); P.push([x,y]); }
+        // ajustement de similitude pour finir exactement au point End du fichier
+        const vx=x-A[0], vy=y-A[1], wx=B[0]-A[0], wy=B[1]-A[1], d2=vx*vx+vy*vy;
+        const ca=(vx*wx+vy*wy)/d2, sa=(vx*wy-vy*wx)/d2;
+        if(Math.abs(Math.hypot(ca,sa)-1)>0.002) warn.push(nm+' : spirale peu cohérente avec ses extrémités ('+((Math.hypot(ca,sa)-1)*L*1000).toFixed(0)+' mm)');
+        const Q=P.map(([px,py])=>{ const dx=px-A[0], dy=py-A[1]; return [A[0]+ca*dx-sa*dy, A[1]+sa*dx+ca*dy]; });
+        els.push({t:'S',A,B,len:L,s0:s,P:Q,h}); s+=L;
+        lastDir=th0+(k0+k1)/2*L+Math.atan2(sa,ca);
+      }
+      else warn.push(nm+' : élément '+t+' non pris en charge');
+    }
+    if(!els.length) continue;
+    const dl=num(al,'length'); if(dl!=null && Math.abs(dl*k-s)>0.001) warn.push(nm+' : longueur calculée '+s.toFixed(3)+' m ≠ '+(dl*k).toFixed(3)+' m déclarée');
+    for(let i=1;i<els.length;i++){ const g=Math.hypot(els[i].A[0]-els[i-1].B[0],els[i].A[1]-els[i-1].B[1]); if(g>0.001) warn.push(nm+' : discontinuité de '+(g*1000).toFixed(0)+' mm au PM '+fmtPM(sta0+els[i].s0)); }
+    if(kids(al,'StaEquation').length) warn.push(nm+' : équation de chaînage ignorée (PM continus depuis le départ)');
+    // profils : premier ProfAlign (profil de conception) ; les ProfSurf (terrain) sont ignorés
+    const profs=[];
+    for(const pr of kids(al,'Profile')) for(const pa of kids(pr,'ProfAlign')){
+      const nodes=[];
+      for(const c of pa.children){ const v=nums(c); if(!v||v.length<2) continue; const tn=c.localName; if(tn!=='PVI'&&tn!=='ParaCurve'&&tn!=='CircCurve'&&tn!=='UnsymParaCurve') continue;
+        let L=tn==='PVI'?0:(num(c,'length')||0)*k, L1=null, L2=null;
+        if(tn==='UnsymParaCurve'){ L1=(num(c,'lengthIn')||0)*k; L2=(num(c,'lengthOut')||0)*k; L=L1+L2; }
+        nodes.push({s:v[0]*k, z:v[1]*k, L, L1, L2}); }
+      if(nodes.length>=2) profs.push({name:pa.getAttribute('name')||'Profil', nodes});
+    }
+    aligns.push({name:nm, sta0, len:s, els, profs, prof:profs[0]||null});
+  }
+  // ---- surfaces TIN
+  const surfs=[];
+  for(const sf of all(root,'Surface')){
+    const nm=sf.getAttribute('name')||('Surface '+(surfs.length+1));
+    const def=kid(sf,'Definition'); if(!def){ continue; }
+    const P=new Map();
+    for(const p of kids(kid(def,'Pnts'),'P')){ const v=nums(p); if(v&&v.length>=3) P.set(p.getAttribute('id'),[v[1]*k,v[0]*k,v[2]*k]); }
+    const T=[]; let inv=0;
+    for(const f of kids(kid(def,'Faces'),'F')){ if(f.getAttribute('i')==='1'){ inv++; continue; } const ids=f.textContent.trim().split(/\s+/); if(ids.length<3) continue; const a=P.get(ids[0]), b=P.get(ids[1]), c=P.get(ids[2]); if(a&&b&&c) T.push([a,b,c]); }
+    if(!T.length){ warn.push(nm+' : surface sans triangles'); continue; }
+    surfs.push({name:nm, n:P.size, T, inv});
+  }
+  if(!aligns.length && !surfs.length) throw new Error('aucun alignement ni surface TIN dans ce fichier');
+  return {name, aligns, surfs, warn};
+}
+/* --- calculs sur un alignement (coordonnées locales) --- */
+function alLocal(al,ox,oy){
+  const m=p=>[p[0]-ox,p[1]-oy];
+  return {...al, els:al.els.map(e=>{ const o={...e, A:m(e.A), B:m(e.B)}; if(e.C) o.C=m(e.C); if(e.P) o.P=e.P.map(m); return o; })};
+}
+function elProj(e,x,y){ // -> {s (dans l'élément, borné), ec (+ droite), d (distance au pied), u (non borné)}
+  if(e.t==='L'){ const ux=(e.B[0]-e.A[0])/e.len, uy=(e.B[1]-e.A[1])/e.len, dx=x-e.A[0], dy=y-e.A[1]; const u=dx*ux+dy*uy, ec=dx*uy-dy*ux; const s=Math.max(0,Math.min(e.len,u)); return {s,u,ec,d:Math.hypot(dx-s*ux,dy-s*uy)}; }
+  if(e.t==='A'){ const dx=x-e.C[0], dy=y-e.C[1], rho=Math.hypot(dx,dy); let ph=(Math.atan2(dy,dx)-e.a0)*e.rot; ph=((ph+Math.PI-e.da/2)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI+e.da/2;
+    const u=ph*e.r, s=Math.max(0,Math.min(e.len,u)), ec=e.rot>0? rho-e.r : e.r-rho;
+    if(s===u) return {s,u,ec,d:Math.abs(ec)}; const q=elPt(e,s,0); return {s,u,ec,d:Math.hypot(x-q[0],y-q[1])}; }
+  // spirale : polyligne dense
+  let best=null; const P=e.P;
+  for(let i=0;i+1<P.length;i++){ const ax=P[i][0],ay=P[i][1],bx=P[i+1][0],by=P[i+1][1],vx=bx-ax,vy=by-ay,l=Math.hypot(vx,vy)||1e-12; const t=((x-ax)*vx+(y-ay)*vy)/l; const tc=Math.max(0,Math.min(l,t)); const fx=ax+vx/l*tc, fy=ay+vy/l*tc; const d=Math.hypot(x-fx,y-fy);
+    if(!best||d<best.d){ const sl=i*e.h; best={d, s:sl+tc, u:(i===0&&t<0)||(i===P.length-2&&t>l)? sl+t : sl+tc, ec:((x-ax)*vy-(y-ay)*vx)/l}; } }
+  return best;
+}
+function elPt(e,s,ec){ // point à la distance s dans l'élément, décalé de ec (+ droite)
+  if(e.t==='L'){ const ux=(e.B[0]-e.A[0])/e.len, uy=(e.B[1]-e.A[1])/e.len; return [e.A[0]+ux*s+uy*ec, e.A[1]+uy*s-ux*ec]; }
+  if(e.t==='A'){ const a=e.a0+e.rot*s/e.r, rr=e.rot>0? e.r+ec : e.r-ec; return [e.C[0]+rr*Math.cos(a), e.C[1]+rr*Math.sin(a)]; }
+  const i=Math.max(0,Math.min(e.P.length-2,Math.floor(s/e.h))), t=s-i*e.h, a=e.P[i], b=e.P[i+1], vx=b[0]-a[0], vy=b[1]-a[1], l=Math.hypot(vx,vy)||1e-12, ux=vx/l, uy=vy/l;
+  return [a[0]+ux*t+uy*ec, a[1]+uy*t-ux*ec];
+}
+function alStaOff(al,x,y){ // -> {sta, ec, inside, d}
+  let best=null, bi=0;
+  al.els.forEach((e,i)=>{ const r=elProj(e,x,y); if(r && (!best || r.d<best.d-1e-9)){ best=r; bi=i; } });
+  if(!best) return null;
+  const e=al.els[bi]; let inside=true, s=best.s;
+  if(best.u<-1e-6){ if(bi===0){ inside=false; } }
+  if(best.u>e.len+1e-6){ if(bi===al.els.length-1){ inside=false; } }
+  return {sta:al.sta0+e.s0+s, ec:best.ec, inside, d:best.d, el:bi, s};
+}
+function alPointAt(al,sta,ec){
+  const sl=sta-al.sta0; let e=al.els[al.els.length-1];
+  for(const q of al.els){ if(sl<=q.s0+q.len+1e-9){ e=q; break; } }
+  return elPt(e, Math.max(0,Math.min(e.len,sl-e.s0)), ec);
+}
+function profZ(pr,sta){
+  const N=pr.nodes; if(!N.length||sta<N[0].s-1e-6||sta>N[N.length-1].s+1e-6) return null;
+  const g=i=> (N[i+1].z-N[i].z)/((N[i+1].s-N[i].s)||1e-12);
+  for(let i=1;i<N.length-1;i++){ const n=N[i]; if(!(n.L>0)) continue; const L1=n.L1!=null?n.L1:n.L/2, L2=n.L2!=null?n.L2:n.L/2;
+    const b=n.s-L1, e=n.s+L2; if(sta>=b&&sta<=e){ const gi=g(i-1), go=g(i);
+      if(n.L1!=null&&Math.abs(L1-L2)>1e-6){ // parabole asymétrique : deux paraboles raccordées sous le PIV
+        const gm=(gi*L1+go*L2)/(L1+L2); // pente au point commun (formule usuelle)
+        if(sta<=n.s){ const x=sta-b; return n.z-gi*L1 + gi*x + (gm-gi)/(2*L1)*x*x; } const x=sta-n.s, zc=n.z-gi*L1+gi*L1+(gm-gi)/2*L1; return zc + gm*x + (go-gm)/(2*L2)*x*x; }
+      const x=sta-b; return n.z-gi*L1 + gi*x + (go-gi)/(2*(L1+L2))*x*x; } }
+  for(let i=0;i<N.length-1;i++) if(sta<=N[i+1].s+1e-9) return N[i].z+g(i)*(sta-N[i].s);
+  return N[N.length-1].z;
+}
+/* --- surfaces : interpolation dans le triangle qui contient le point --- */
+function tinIndex(T){
+  let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+  for(const t of T) for(const p of t){ if(p[0]<minx)minx=p[0]; if(p[0]>maxx)maxx=p[0]; if(p[1]<miny)miny=p[1]; if(p[1]>maxy)maxy=p[1]; }
+  const cs=Math.max(0.5,Math.sqrt(((maxx-minx)*(maxy-miny)||1)/T.length)*2), nx=Math.max(1,Math.ceil((maxx-minx)/cs)+1), grid=new Map();
+  T.forEach((t,i)=>{ const x0=Math.floor((Math.min(t[0][0],t[1][0],t[2][0])-minx)/cs), x1=Math.floor((Math.max(t[0][0],t[1][0],t[2][0])-minx)/cs), y0=Math.floor((Math.min(t[0][1],t[1][1],t[2][1])-miny)/cs), y1=Math.floor((Math.max(t[0][1],t[1][1],t[2][1])-miny)/cs);
+    for(let a=x0;a<=x1;a++) for(let b=y0;b<=y1;b++){ const key=b*nx+a; (grid.get(key)||grid.set(key,[]).get(key)).push(i); } });
+  return {T,minx,miny,cs,nx,grid};
+}
+function tinZ(ix,x,y){
+  const a=Math.floor((x-ix.minx)/ix.cs), b=Math.floor((y-ix.miny)/ix.cs), L=ix.grid.get(b*ix.nx+a); if(!L||a<0) return null;
+  for(const i of L){ const [p,q,r]=ix.T[i]; const det=(q[1]-r[1])*(p[0]-r[0])+(r[0]-q[0])*(p[1]-r[1]); if(Math.abs(det)<1e-12) continue;
+    const l1=((q[1]-r[1])*(x-r[0])+(r[0]-q[0])*(y-r[1]))/det, l2=((r[1]-p[1])*(x-r[0])+(p[0]-r[0])*(y-r[1]))/det, l3=1-l1-l2;
+    if(l1>=-1e-9&&l2>=-1e-9&&l3>=-1e-9) return l1*p[2]+l2*q[2]+l3*r[2]; }
+  return null;
+}
+/* --- calques XML· injectés dans le plan (fond DXF réel ou plan créé à partir du LandXML) --- */
+function lxInject(){
+  if(S.dxf) for(const n of Object.keys(S.dxf.layers)) if(n.startsWith(LXP)) delete S.dxf.layers[n];
+  if(!S.lx.length){ if(S.dxf&&S.dxf.synthetic) S.dxf=null; return; }
+  if(!S.dxf){
+    let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity; const ext=p=>{ if(p[0]<minx)minx=p[0]; if(p[0]>maxx)maxx=p[0]; if(p[1]<miny)miny=p[1]; if(p[1]>maxy)maxy=p[1]; };
+    for(const f of S.lx){ for(const a of f.aligns) for(const e of a.els){ ext(e.A); ext(e.B); } for(const s of f.surfs) for(const t of s.T) t.forEach(ext); }
+    const ox=Math.round((minx+maxx)/2), oy=Math.round((miny+maxy)/2);
+    S.dxf={name:S.lx[0].name, layers:{}, ox, oy, bbox:{minx:minx-ox,miny:miny-oy,maxx:maxx-ox,maxy:maxy-oy}, synthetic:true};
+    S.layerOn={}; S.axisSel=null; loadProject();
+  } else if(S.dxf.synthetic) S.dxf.name=S.lx[0].name;
+  const ox=S.dxf.ox, oy=S.dxf.oy, b=S.dxf.bbox;
+  const ext=(x,y)=>{ if(x<b.minx)b.minx=x; if(x>b.maxx)b.maxx=x; if(y<b.miny)b.miny=y; if(y>b.maxy)b.maxy=y; };
+  for(const f of S.lx){
+    for(const a of f.aligns){
+      const al=alLocal(a,ox,oy), segs=[], verts=[], texts=[];
+      const seg=(p,q)=>{ segs.push(p[0],p[1],0,q[0],q[1],0); ext(p[0],p[1]); ext(q[0],q[1]); };
+      for(const e of al.els){
+        verts.push(e.A[0],e.A[1],0);
+        const n = e.t==='L'?1 : e.t==='A'? Math.max(2,Math.ceil(e.da/(2*Math.acos(Math.max(-1,1-0.0005/e.r))))) : Math.max(2,Math.ceil(e.len/0.25));
+        let prev=e.A; for(let i=1;i<=n;i++){ const q = i===n? e.B : elPt(e,e.len*i/n,0); seg(prev,q); prev=q; }
+      }
+      const last=al.els[al.els.length-1]; verts.push(last.B[0],last.B[1],0);
+      // repères de chaînage aux 20 m (et au début / à la fin)
+      const step=20, s1=al.sta0+al.len, marks=[al.sta0]; for(let s=Math.ceil((al.sta0+1e-6)/step)*step; s<s1-1e-6; s+=step) marks.push(s); marks.push(s1);
+      for(const s of marks){ const p0=alPointAt(al,s,-0.6), p1=alPointAt(al,s,0.6), lb=alPointAt(al,s,0.9); seg(p0,p1);
+        const ang=Math.atan2(p1[1]-p0[1],p1[0]-p0[0]); texts.push({x:lb[0],y:lb[1],h:0.45,a:ang,s:fmtPM(s),mt:false}); }
+      S.dxf.layers[LXP+'ALIGNEMENT '+a.name]={name:LXP+'ALIGNEMENT '+a.name, color:1, segs:Float64Array.from(segs), verts:Float64Array.from(verts), texts, marks:new Float64Array(0), n:al.els.length, has3D:false, lx:{kind:'align', al, file:f.name}};
+    }
+    for(const s of f.surfs){
+      const T=s.T.map(t=>t.map(p=>[p[0]-ox,p[1]-oy,p[2]])), segs=[], seen=new Set();
+      const key=p=>p[0].toFixed(4)+','+p[1].toFixed(4);
+      for(const t of T) for(let i=0;i<3;i++){ const p=t[i], q=t[(i+1)%3], k1=key(p), k2=key(q), kk=k1<k2?k1+'|'+k2:k2+'|'+k1; if(seen.has(kk)) continue; seen.add(kk); segs.push(p[0],p[1],p[2],q[0],q[1],q[2]); ext(p[0],p[1]); }
+      S.dxf.layers[LXP+'SURFACE '+s.name]={name:LXP+'SURFACE '+s.name, color:8, segs:Float64Array.from(segs), verts:new Float64Array(0), texts:[], marks:new Float64Array(0), n:T.length, has3D:true, lx:{kind:'surf', ix:tinIndex(T), name:s.name, file:f.name}};
+    }
+  }
+}
+function lxKind(n){ const ly=S.dxf&&S.dxf.layers[n]; return ly&&ly.lx?ly.lx.kind:null; }
+function lxShort(n){ return String(n).replace(LXP+'ALIGNEMENT ','').replace(LXP+'SURFACE ',''); }
+function lxLocate(p){ // PM / EC du point sur l'alignement le plus proche (information)
+  if(!S.dxf) return null; let best=null;
+  for(const ly of Object.values(S.dxf.layers)){ if(!ly.lx||ly.lx.kind!=='align') continue; const so=alStaOff(ly.lx.al,p.x,p.y); if(so&&so.inside&&(!best||Math.abs(so.ec)<Math.abs(best.ec))) best={...so,layer:ly.name}; }
+  return best;
+}
+function planNames(){ const a=[]; if(S.dxf&&!S.dxf.synthetic) a.push(S.dxf.name); for(const f of S.lx) a.push(f.name); return a.join(' · '); }
+
+/* ============================================================
    Lecture des points (P,N,E,Z,D par défaut ; P,E,N,Z,D détecté)
    ============================================================ */
 function parsePoints(text,name){
@@ -494,7 +701,7 @@ function loadProject(){
   const k=projKey(); S.axes=[]; S.pstate={};
   if(!k) return false;
   const pj=load(k,null); if(!pj) return false;
-  S.axes=pj.axes||[]; S.pstate=pj.pstate||{}; if(pj.codeRole) S.codeRole=pj.codeRole; if(pj.dossier) S.dossier=pj.dossier;
+  S.axes=pj.axes||[]; S.pstate=pj.pstate||{}; if(pj.codeRole) S.codeRole=pj.codeRole; if(pj.codeEC) S.codeEC=pj.codeEC; if(pj.dossier) S.dossier=pj.dossier;
   return S.axes.length>0;
 }
 let persistT=0;
@@ -506,7 +713,7 @@ function persist(){
       const st={}; if(p.exMode) st.exMode=p.exMode; if(p.method) st.method=p.method; if(p.layer) st.layer=p.layer; if(p.note) st.note=p.note; if(p.axes.length) st.axes=p.axes; if(p.rep) st.rep=1; if(p.role) st.role=p.role;
       if(Object.keys(st).length) S.pstate[p.pkey]=st; else delete S.pstate[p.pkey];
     }
-    store(k,{axes:S.axes,pstate:S.pstate,codeRole:S.codeRole,dossier:S.dossier});
+    store(k,{axes:S.axes,pstate:S.pstate,codeRole:S.codeRole,dossier:S.dossier,codeEC:S.codeEC});
   },300);
 }
 function codesPresent(){ const m=new Map(); for(const p of ALL){ m.set(p.code,(m.get(p.code)||0)+1); } return [...m.entries()].sort((a,b)=>b[1]-a[1]); }
@@ -704,7 +911,23 @@ function analyse(){
     const meth=methodFor(p);
     const lays=layersFor(p);
     if(!S.dxf || !lays.length || meth==='ignore'){ p.status = p.ex?'ex':'nc'; continue; }
-    const nr=nearest(p,lays);
+    const alL=lays.filter(n=>lxKind(n)==='align'), sfL=lays.filter(n=>lxKind(n)==='surf'), plL=lays.filter(n=>!lxKind(n));
+    let r=null;
+    if(alL.length && meth!=='vertex' && !plL.length){
+      // alignement LandXML : PM et EC exacts ; la référence est la ligne décalée de l'EC prévu du code
+      const ecTh=+(S.codeEC[p.code]||0); let best=null;
+      for(const n of alL){ const al=S.dxf.layers[n].lx.al, so=alStaOff(al,p.x,p.y); if(!so) continue; const dd=Math.abs(so.ec-ecTh)+(so.inside?0:1e6); if(!best||dd<best.dd) best={n,al,so,dd}; }
+      if(best){ const so=best.so, T=alPointAt(best.al,so.sta,ecTh), dE=p.x-T[0], dN=p.y-T[1];
+        r={kind:'route', layer:best.n, tx:T[0], ty:T[1], tz:null, dE, dN, d:so.inside?Math.abs(so.ec-ecTh):Math.hypot(dE,dN), ec:so.ec-ecTh, pm:so.sta, ecTh, ecMes:so.ec, hors:!so.inside};
+        if(best.al.prof && Math.abs(ecTh)<1e-9 && !sfL.length){ const z=profZ(best.al.prof,so.sta); if(z!=null){ r.zprof=z; r.zprofName=best.al.prof.name; } } }
+    }
+    if(!r && !plL.length && !alL.length && sfL.length){
+      // surface TIN seule : contrôle altimétrique à la position mesurée
+      r={kind:'surf', layer:sfL[0], tx:p.x, ty:p.y, tz:null, dE:0, dN:0, d:0, ec:null};
+      const lc=lxLocate(p); if(lc){ r.pm=lc.sta; r.ecMes=lc.ec; r.alLayer=lc.layer; }
+    }
+    if(!r){
+    const nr=nearest(p, plL.length?plL:alL.length?alL:sfL);
     let kind = meth;
     if(kind==='auto'){
       // point posé sur une ligne (à moins de ¼ du rayon d'accroche) et nettement plus loin d'un sommet :
@@ -715,17 +938,21 @@ function analyse(){
     }
     if(kind==='vertex' && !nr.v) kind='line';
     if(kind==='line' && !nr.s) kind='vertex';
-    let r;
     if(kind==='vertex'){ const v=nr.v; r={kind, layer:v.layer, tx:v.x, ty:v.y, tz:v.z, dE:p.x-v.x, dN:p.y-v.y, d:v.d, ec:null}; }
     else { const s=nr.s; r={kind, layer:s.layer, tx:s.x, ty:s.y, tz:s.z, dE:p.x-s.x, dN:p.y-s.y, d:s.d, ec:s.ec, seg:s.seg}; }
-    // Z théorique : DXF si le calque est 3D, sinon Z de conception saisi pour le code
+    }
+    // Z théorique : surface LandXML à la position mesurée, profil de l'alignement (sur l'axe), DXF si le calque est 3D, sinon Z de conception saisi pour le code
     r.zth=null; r.zsrc=null;
     const ly=S.dxf.layers[r.layer];
-    if(ly && ly.has3D){ r.zth=r.tz; r.zsrc='DXF'; }
+    if(sfL.length){ for(const n of sfL){ const z=tinZ(S.dxf.layers[n].lx.ix,p.x,p.y); if(z!=null){ r.zth=z; r.zsrc='Surface '+lxShort(n); break; } } if(r.zth==null) r.zout=true; }
+    else if(r.zprof!=null){ r.zth=r.zprof; r.zsrc='Profil '+r.zprofName; }
+    else if(ly && ly.has3D && !ly.lx){ r.zth=r.tz; r.zsrc='DXF'; }
     else if(S.codeZ[p.code]!=null && S.codeZ[p.code]!==''){ r.zth=+S.codeZ[p.code]; r.zsrc='Conception'; }
     r.dZ = (is3D && r.zth!=null && p.Z!=null) ? p.Z-r.zth : null;
     p.res=r;
     if(p.ex){ p.status='ex'; continue; }
+    if(r.kind==='surf'){ p.status = r.dZ==null ? 'nc' : Math.abs(r.dZ)>S.tolZ+1e-9 ? 'out' : 'ok'; continue; }
+    if(r.hors) { p.status='doubt'; continue; }
     if(r.d>S.doubt) p.status='doubt';
     else if(r.d>S.tol+1e-9 || (r.dZ!=null && Math.abs(r.dZ)>S.tolZ+1e-9)) p.status='out';
     else p.status='ok';
@@ -795,6 +1022,8 @@ function render(){
       if(S.layerOn[ly.name]===false) continue;
       const strong=used.has(ly.name);
       ctx.strokeStyle= strong? C['plan-line-strong'] : C['plan-line']; ctx.lineWidth= strong?1.1:0.8;
+      if(ly.lx&&ly.lx.kind==='align'){ ctx.strokeStyle=C.accent; ctx.lineWidth=strong?2:1.5; }
+      else if(ly.lx&&ly.lx.kind==='surf'){ ctx.strokeStyle=C['plan-line']; ctx.lineWidth=0.6; }
       ctx.beginPath(); const G=ly.segs;
       for(let k=0;k<G.length;k+=6){ const a=toS(G[k],G[k+1]), b=toS(G[k+3],G[k+4]); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
       ctx.stroke();
@@ -921,6 +1150,7 @@ function pick(sx,sy,add){
    Panneaux
    ============================================================ */
 const STAT_LBL={ok:'Conforme',out:'Hors tolérance',doubt:'Douteux',ex:'Exclu',nc:'Non classé',st:'Station / réf.'};
+const KIND_LBL={vertex:'Sommet',line:'Ligne',route:'Alignement',surf:'Surface'};
 const METH_LBL={auto:'Auto',vertex:'Sommet',line:'Ligne (EC)',ignore:'Ignorer'};
 function pill(st){ return `<span class="pill ${st}">${STAT_LBL[st]}</span>`; }
 function recompute(){ analyse(); renderAll(); persist(); }
@@ -931,8 +1161,10 @@ function renderFiles(){
   const h=[];
   if(mandatActive()) h.push(`<span class="chip" title="Les enregistrements vont dans ${esc(MANDAT.contrat)}\\02_IMPLANTATION\\04_VALIDATION">Mandat <b>${esc(MANDAT.contrat)}</b><span>→ 04_VALIDATION</span><button class="x" data-rmmandat title="Ne plus écrire dans ce contrat (retour aux téléchargements)">×</button></span>`);
   if(S.example) h.push(`<span class="banner">Exemple fictif chargé · ouvrez votre plan DXF et vos fichiers de points pour remplacer</span>`);
-  if(S.dxf){ const nl=Object.keys(S.dxf.layers).length; h.push(`<span class="chip">DXF <b title="${esc(S.dxf.name)}">${esc(S.dxf.name)}</b><span>${nl} calques</span><button class="x" data-rmdxf title="Retirer le plan">×</button></span>`); }
-  else h.push(`<span class="notice">Aucun plan DXF chargé</span>`);
+  if(S.dxf && !S.dxf.synthetic){ const nl=Object.keys(S.dxf.layers).filter(n=>!n.startsWith(LXP)).length; h.push(`<span class="chip">DXF <b title="${esc(S.dxf.name)}">${esc(S.dxf.name)}</b><span>${nl} calques</span><button class="x" data-rmdxf title="Retirer le plan">×</button></span>`); }
+  else if(!S.lx.length) h.push(`<span class="notice">Aucun plan DXF chargé</span>`);
+  S.lx.forEach((f,i)=>{ const parts=[]; if(f.aligns.length) parts.push(f.aligns.length+' alignement'+(f.aligns.length>1?'s':'')+(f.aligns.some(a=>a.prof)?' + profil':'')); if(f.surfs.length) parts.push(f.surfs.length+' surface'+(f.surfs.length>1?'s':''));
+    h.push(`<span class="chip" title="${esc([...f.aligns.map(a=>a.name+' : PM '+fmtPM(a.sta0)+' à '+fmtPM(a.sta0+a.len)+(a.prof?' · profil '+a.prof.name:'')), ...f.surfs.map(s=>s.name+' : '+s.n+' points, '+s.T.length+' triangles'), ...f.warn].join('\n'))}">LandXML <b title="${esc(f.name)}">${esc(f.name)}</b><span>${parts.join(' · ')}</span>${f.warn.length?`<span class="pill doubt" title="${esc(f.warn.join('\n'))}">${f.warn.length} avert.</span>`:''}<button class="x" data-rmlx="${i}" title="Retirer ce fichier LandXML">×</button></span>`); });
   S.files.forEach((f,i)=>{
     h.push(`<span class="chip"><input type="checkbox" data-fon="${i}" ${f.on?'checked':''} aria-label="Inclure ${esc(f.name)}"><b title="${esc(f.name)}">${esc(f.name)}</b><span>${f.pts.length} pts</span>
       <select data-ford="${i}" title="Ordre des colonnes" style="width:auto;padding:1px 3px;font-size:11.5px"><option value="PNEZD" ${f.order==='PNEZD'?'selected':''}>P,N,E,Z,D</option><option value="PENZD" ${f.order==='PENZD'?'selected':''}>P,E,N,Z,D</option></select>
@@ -953,7 +1185,8 @@ $('#files').addEventListener('click',e=>{
   const t=e.target.closest('button'); if(!t) return;
   if(t.dataset.rmf!=null){ S.files.splice(+t.dataset.rmf,1); S.example=false; buildAll(); S.sel.clear(); recompute(); }
   if(t.dataset.rmmandat!=null){ MANDAT.cdir=null; MANDAT.contrat=null; VAL.dest=null; VAL.loadedFor=null; renderFiles(); renderReport(); toast('Mandat fermé : les enregistrements iront dans Téléchargements'); }
-  if(t.dataset.rmdxf!=null){ S.dxf=null; S.example=false; S.axes=[]; buildAll(); recompute(); }
+  if(t.dataset.rmdxf!=null){ S.dxf=null; S.example=false; S.axes=[]; lxInject(); buildAll(); autoMap(); recompute(); fit(); }
+  if(t.dataset.rmlx!=null){ S.lx.splice(+t.dataset.rmlx,1); lxInject(); buildAll(); autoMap(); recompute(); fit(); }
 });
 
 function renderCodes(){
@@ -971,19 +1204,22 @@ function renderCodes(){
    </div>
    ${ruleWarningsHTML()}
    <p class="help" style="margin-top:8px">Méthode <b>Auto</b> : si un sommet du plan est dans le rayon d'accroche, l'écart est mesuré au sommet (coin) ; sinon, ou si le point est sur une ligne (à moins de ¼ du rayon d'accroche) et nettement plus loin du sommet, c'est l'écart perpendiculaire à la ligne (EC, + à droite). La tolérance ne change jamais la référence : elle sert seulement au verdict. Forcez <b>Sommet</b> pour un code de coins.${is3D?' En 3D, le Z théorique vient du DXF si le calque a des élévations, sinon du Z de conception saisi pour le code.':''}</p></div>`;
-  h+=`<div class="sect"><h4>Codes du levé → calques du plan</h4><p class="help" style="margin-bottom:8px">Associé automatiquement par le nom de calque abrégé à 8 caractères (format Trimble). Ajoutez, retirez ou ignorez au besoin.</p><div style="display:flex;flex-direction:column;gap:8px">`;
+  h+=`<div class="sect"><h4>Codes du levé → calques du plan</h4><p class="help" style="margin-bottom:8px">Associé automatiquement par le nom de calque abrégé à 8 caractères (format Trimble). Ajoutez, retirez ou ignorez au besoin.${S.lx.length?' <b>Route LandXML</b> : associez un code à <span class="mono">XML·ALIGNEMENT</span> pour obtenir PM et EC (saisissez l\'EC prévu, ex. −1,500 pour la bordure gauche), et/ou à <span class="mono">XML·SURFACE</span> pour le ΔZ à la position mesurée (mode 3D).':''}</p><div style="display:flex;flex-direction:column;gap:8px">`;
   for(const [code,n] of codes){
     const lays=S.codeLayers[code]||[]; const meth=S.codeMethod[code]||'auto';
     const off = !lays.length || meth==='ignore';
     const opts=lnames.filter(l=>!lays.includes(l)).map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join('');
     const any3D = lays.some(l=>S.dxf&&S.dxf.layers[l]&&S.dxf.layers[l].has3D);
+    const hasAl = lays.some(l=>lxKind(l)==='align'), hasSf = lays.some(l=>lxKind(l)==='surf');
+    const hasProf = !hasSf && !(+(S.codeEC[code]||0)) && lays.some(l=>lxKind(l)==='align'&&S.dxf.layers[l].lx.al.prof);
     h+=`<div class="code ${off?'off':''}">
       <div class="hd"><span class="nm">${code?esc(code):'<i>(sans code)</i>'}</span><span class="ct">${n} pts</span>
         <select data-cr="${esc(code)}" aria-label="Rôle des points ${esc(code)}" title="Rôle des points de ce code"><option value="">Rôle : auto (${ROLE_LBL[autoRole({code,desc:code,id:''})].split(' ')[0]})</option>${Object.entries(ROLE_LBL).map(([k,v])=>`<option value="${k}" ${S.codeRole[code]===k?'selected':''}>${v}</option>`).join('')}</select>
         <select data-cm="${esc(code)}" aria-label="Méthode pour ${esc(code)}">${['auto','vertex','line','ignore'].map(m=>`<option value="${m}" ${m===meth?'selected':''}>${METH_LBL[m]}</option>`).join('')}</select></div>
       <div class="lays">${lays.map(l=>`<span class="lay">${esc(l)}<button data-rml="${esc(code)}" data-l="${esc(l)}" title="Retirer">×</button></span>`).join('')||'<span class="ct">Non classé</span>'}
         ${S.dxf?`<select data-addl="${esc(code)}" aria-label="Ajouter un calque à ${esc(code)}"><option value="">+ calque…</option>${opts}</select>`:''}</div>
-      ${is3D && lays.length && meth!=='ignore' ? `<div class="zrow">${any3D?'Z théorique : DXF':'Z de conception'} <input type="number" step="0.001" data-cz="${esc(code)}" value="${S.codeZ[code]??''}" placeholder="${any3D?'(du DXF)':'ex. 44.400'}" ${any3D?'disabled':''}> m</div>`:''}
+      ${hasAl && meth!=='ignore' && meth!=='vertex' ? `<div class="zrow" title="Décalage prévu par rapport à l'alignement : + à droite dans le sens du chaînage, − à gauche. 0 = sur l'axe.">EC prévu <input type="number" step="0.001" data-cec="${esc(code)}" value="${S.codeEC[code]??''}" placeholder="0.000"> m <span class="ct">(+ droite)</span></div>`:''}
+      ${is3D && lays.length && meth!=='ignore' ? (hasSf||hasProf ? `<div class="zrow">Z théorique : ${hasSf?'surface LandXML (à la position mesurée)':'profil de l\'alignement'}</div>` : `<div class="zrow">${any3D?'Z théorique : DXF':'Z de conception'} <input type="number" step="0.001" data-cz="${esc(code)}" value="${S.codeZ[code]??''}" placeholder="${any3D?'(du DXF)':'ex. 44.400'}" ${any3D?'disabled':''}> m</div>`):''}
     </div>`;
   }
   if(!codes.length) h+=`<p class="help">Chargez un fichier de points pour voir ses codes.</p>`;
@@ -1008,6 +1244,7 @@ $('#pane-codes').addEventListener('change',e=>{
   if(t.dataset.cr!=null){ if(t.value) S.codeRole[t.dataset.cr]=t.value; else delete S.codeRole[t.dataset.cr]; recompute(); }
   if(t.dataset.addl!=null && t.value){ (S.codeLayers[t.dataset.addl]=S.codeLayers[t.dataset.addl]||[]).push(t.value); saveMaps(); recompute(); }
   if(t.dataset.cz!=null){ S.codeZ[t.dataset.cz]= t.value===''? null : parseFloat(t.value); recompute(); }
+  if(t.dataset.cec!=null){ const v=parseFloat(t.value); if(t.value===''||!isFinite(v)) delete S.codeEC[t.dataset.cec]; else S.codeEC[t.dataset.cec]=v; recompute(); }
 });
 $('#pane-codes').addEventListener('click',e=>{
   const ch=e.target.closest('button[data-chg]');
@@ -1038,9 +1275,9 @@ function refSig(p){ const r=p.res; return r? r.kind+'|'+r.layer+'|'+r.tx.toFixed
 function saveMaps(){ const m=load('codemap',{}); for(const k in S.codeLayers) if(k) m[k]=S.codeLayers[k]; store('codemap',m); const mm2=load('codemethod',{}); Object.assign(mm2,S.codeMethod); store('codemethod',mm2); }
 
 const COLS=[
-  {k:'rep',t:'Rap.'},{k:'id',t:'Point'},{k:'code',t:'Code'},{k:'kind',t:'Méth.'},{k:'dE',t:'ΔE mm',n:1},{k:'dN',t:'ΔN mm',n:1},{k:'d',t:'Écart mm',n:1},{k:'ec',t:'EC mm',n:1},{k:'dZ',t:'ΔZ mm',n:1,z:1},{k:'status',t:'Statut'},{k:'axes',t:'Axes'},{k:'layer',t:'Calque'},{k:'file',t:'Fichier'}
+  {k:'rep',t:'Rap.'},{k:'id',t:'Point'},{k:'code',t:'Code'},{k:'kind',t:'Méth.'},{k:'pm',t:'PM',n:1},{k:'dE',t:'ΔE mm',n:1},{k:'dN',t:'ΔN mm',n:1},{k:'d',t:'Écart mm',n:1},{k:'ec',t:'EC mm',n:1},{k:'dZ',t:'ΔZ mm',n:1,z:1},{k:'status',t:'Statut'},{k:'axes',t:'Axes'},{k:'layer',t:'Calque'},{k:'file',t:'Fichier'}
 ];
-function val(p,k){ const r=p.res||{}; switch(k){case 'id':return p.id;case 'code':return p.code;case 'kind':return r.kind||'';case 'dE':return r.dE;case 'dN':return r.dN;case 'd':return r.d;case 'ec':return r.ec;case 'dZ':return r.dZ;case 'status':return ({doubt:0,out:1,ok:2,ex:3,nc:4,st:5})[p.status];case 'layer':return r.layer||'';case 'file':return p.file;case 'rep':return p.rep?0:1;case 'axes':return p.axRes.map(a=>a.name).join(' ')||'~';default:return p.idx;} }
+function val(p,k){ const r=p.res||{}; switch(k){case 'id':return p.id;case 'code':return p.code;case 'kind':return r.kind||'';case 'pm':return r.pm;case 'dE':return r.dE;case 'dN':return r.dN;case 'd':return r.d;case 'ec':return r.ec;case 'dZ':return r.dZ;case 'status':return ({doubt:0,out:1,ok:2,ex:3,nc:4,st:5})[p.status];case 'layer':return r.layer||'';case 'file':return p.file;case 'rep':return p.rep?0:1;case 'axes':return p.axRes.map(a=>a.name).join(' ')||'~';default:return p.idx;} }
 function filtered(){
   const f=S.filter;
   return ALL.filter(p=> f==='all' ? true : f==='ctl' ? (p.status!=='nc'&&p.status!=='st') : f==='dup' ? !!p.dupGroup : f==='rep' ? p.rep : f==='axe' ? p.axes.length>0 : f==='chg' ? !!(S.refChg&&S.refChg.uids.includes(p.uid)) : p.status===f);
@@ -1065,10 +1302,11 @@ function renderPoints(){
       switch(c.k){
         case 'id': return `<td class="mono">${esc(p.id)}</td>`;
         case 'code': return `<td class="mono">${esc(p.code)}</td>`;
-        case 'kind': return `<td>${r.kind==='vertex'?'Sommet':r.kind==='line'?'Ligne':''}</td>`;
-        case 'dE': return `<td class="num">${r.kind?smm(r.dE):''}</td>`;
-        case 'dN': return `<td class="num">${r.kind?smm(r.dN):''}</td>`;
-        case 'd': return `<td class="num"><b>${r.kind?mm(r.d):''}</b></td>`;
+        case 'kind': return `<td>${KIND_LBL[r.kind]||''}</td>`;
+        case 'pm': return `<td class="num">${r.pm!=null?fmtPM(r.pm):''}</td>`;
+        case 'dE': return `<td class="num">${r.kind&&r.kind!=='surf'?smm(r.dE):''}</td>`;
+        case 'dN': return `<td class="num">${r.kind&&r.kind!=='surf'?smm(r.dN):''}</td>`;
+        case 'd': return `<td class="num"><b>${r.kind&&r.kind!=='surf'?mm(r.d):''}</b></td>`;
         case 'ec': return `<td class="num">${r.ec!=null?smm(r.ec):''}</td>`;
         case 'dZ': return `<td class="num">${r.dZ!=null?smm(r.dZ):''}</td>`;
         case 'status': return `<td>${pill(p.status)}${p.dupGroup?' <span class="pill dup">doublon</span>':''}</td>`;
@@ -1163,17 +1401,17 @@ function buildCSV(){
   const L=[];
   L.push('Contrôle d\'implantation — analyse complète');
   L.push('Date;'+new Date().toLocaleString('fr-CA'));
-  L.push('Plan;'+(S.dxf?S.dxf.name:''));
+  L.push('Plan;'+planNames());
   L.push('Levés;'+S.files.filter(f=>f.on).map(f=>f.name).join(' | '));
   L.push('Traitement;'+S.mode);
   L.push('Tolérance plan (m);'+n(S.tol)+(is3D?';Tolérance Z (m);'+n(S.tolZ):''));
   L.push('');
-  L.push(['Fichier','Point','Code','Attribut','Est','Nord','Z mesuré','Méthode','Calque réf.','E théo','N théo','ΔE','ΔN','Écart plan','EC (+droite)', ...(is3D?['Z théo','Source Z','ΔZ']:[]),'Axes (Δ mm)','Au rapport','Statut','Remarque'].join(';'));
+  L.push(['Fichier','Point','Code','Attribut','Est','Nord','Z mesuré','Méthode','Calque réf.','E théo','N théo','ΔE','ΔN','Écart plan','EC (+droite)','PM','EC théo','EC mesuré', ...(is3D?['Z théo','Source Z','ΔZ']:[]),'Axes (Δ mm)','Au rapport','Statut','Remarque'].join(';'));
   const ox=S.dxf?S.dxf.ox:0, oy=S.dxf?S.dxf.oy:0;
   for(const p of ALL){
     const r=p.res||{};
     const note=[p.ex?(p.exMode==='out'?'Exclu manuellement':p.autoEx):'', p.note].filter(Boolean).join(' · ');
-    L.push([p.file,p.id,p.code,p.attr,n(p.E),n(p.N),n(p.Z), r.kind==='vertex'?'Sommet':r.kind==='line'?'Ligne':'', r.layer||'', r.kind?n(r.tx+ox):'', r.kind?n(r.ty+oy):'', n(r.dE), n(r.dN), n(r.d), n(r.ec), ...(is3D?[n(r.zth), r.zsrc||'', n(r.dZ)]:[]), p.axRes.map(a=>a.name+(a.d!=null?' '+(a.d*1000).toFixed(1):'')).join(' | '), p.rep?'oui':'', STAT_LBL[p.status], note].map(csvCell).join(';'));
+    L.push([p.file,p.id,p.code,p.attr,n(p.E),n(p.N),n(p.Z), KIND_LBL[r.kind]||'', r.layer||'', r.kind?n(r.tx+ox):'', r.kind?n(r.ty+oy):'', r.kind==='surf'?'':n(r.dE), r.kind==='surf'?'':n(r.dN), r.kind==='surf'?'':n(r.d), n(r.ec), r.pm!=null?fmtPM(r.pm):'', n(r.ecTh), n(r.ecMes), ...(is3D?[n(r.zth), r.zsrc||'', n(r.dZ)]:[]), p.axRes.map(a=>a.name+(a.d!=null?' '+(a.d*1000).toFixed(1):'')).join(' | '), p.rep?'oui':'', STAT_LBL[p.status], note].map(csvCell).join(';'));
   }
   return '﻿'+L.join('\r\n');
 }
@@ -1188,6 +1426,8 @@ function refRows(p){
   if(p.axRes.length) return p.axRes.map(a=>({type:'axe', ref:'Axe '+a.name, axis:a.id, pm:a.pm, th:a.ot, me:a.om, d:a.d, st:a.st}));
   const r=p.res;
   if(!r) return [{type:'none', ref:'Aucune référence', st:p.status}];
+  if(r.kind==='route') return [{type:'route', ref:'Alignement '+lxShort(r.layer), pm:r.pm, th:r.ecTh, me:r.ecMes, d:r.ec, st:p.status, layer:r.layer}];
+  if(r.kind==='surf') return [{type:'surf', ref:'Surface '+lxShort(r.layer), pm:r.pm, th:r.zth, me:p.Z, d:r.dZ, st:p.status}];
   if(r.kind==='line') return [{type:'ligne', ref:'Ligne '+r.layer, th:0, me:r.ec, d:r.ec, st:p.status}];
   return [{type:'sommet', ref:'Sommet '+r.layer, dE:r.dE, dN:r.dN, d:r.d, st:p.status}];
 }
@@ -1264,15 +1504,15 @@ function reportBody(){
   const ent=(()=>{const n=String((MANDAT&&MANDAT.contrat)||R.mandat||'').toUpperCase();return /^MA-/.test(n)?'MA':/^AN-/.test(n)?'AN':'';})();
   const logos=ent==='MA'?`<img class="logo" src="${MT_LOGO}" alt="MECATECH Arpentage">`:ent==='AN'?`<img class="logo" src="${AN_LOGO}" alt="Arpent-Nord construction">`:`<img class="logo" src="${AN_LOGO}" alt="Arpent-Nord construction"><img class="logo" src="${MT_LOGO}" alt="MECATECH Arpentage">`;
   let h=`<div class="head"><div class="ttl">${logos}<div><h1>Rapport d'implantation</h1><div class="sub">${esc(R.projet||'Projet')}${R.lieu?' · '+esc(R.lieu):''}</div></div></div>
-    <div class="meta"><b>Date</b><span>${today}</span>${R.mandat?`<b>Dossier</b><span>${esc(R.mandat)}</span>`:''}${R.client?`<b>Client</b><span>${esc(R.client)}</span>`:''}<b>Plan</b><span>${esc(S.dxf?S.dxf.name:'')}</span><b>Levé(s)</b><span>${esc(S.files.filter(f=>f.on).map(f=>f.name).join(', '))}</span><b>Tolérance</b><span>${(S.tol*1000).toFixed(0)} mm en plan${is3D?' · '+(S.tolZ*1000).toFixed(0)+' mm en Z':''}</span>${R.arpenteur?`<b>Préparé par</b><span>${esc(R.arpenteur)}</span>`:''}</div></div>`;
+    <div class="meta"><b>Date</b><span>${today}</span>${R.mandat?`<b>Dossier</b><span>${esc(R.mandat)}</span>`:''}${R.client?`<b>Client</b><span>${esc(R.client)}</span>`:''}<b>Plan</b><span>${esc(planNames())}</span><b>Levé(s)</b><span>${esc(S.files.filter(f=>f.on).map(f=>f.name).join(', '))}</span><b>Tolérance</b><span>${(S.tol*1000).toFixed(0)} mm en plan${is3D?' · '+(S.tolZ*1000).toFixed(0)+' mm en Z':''}</span>${R.arpenteur?`<b>Préparé par</b><span>${esc(R.arpenteur)}</span>`:''}</div></div>`;
   if(R.notes) h+=`<p style="margin:10px 0 0">${esc(R.notes)}</p>`;
   h+=`<div class="sum"><div><b>${pts.length}</b>points</div><div><b>${rows.length}</b>contrôles</div><div><b class="ok">${cnt.ok||0}</b>conformes</div><div><b class="out">${(cnt.out||0)+(cnt.doubt||0)}</b>non conformes</div><div><b>${rows.length?(dmax*1000).toFixed(1):'—'}</b>écart max (mm)</div></div>`;
-  h+=`<p class="note">PM : chaînage le long de l'axe depuis son origine. EC : distance perpendiculaire à l'axe, positive à droite dans le sens de l'axe. Écart = mesuré − théorique. Théorique = élément du plan le plus proche selon le code du point (sommet, ligne, ou intersection de la ligne avec un axe).</p>`;
+  h+=`<p class="note">PM : chaînage le long de l'axe depuis son origine. EC : distance perpendiculaire à l'axe, positive à droite dans le sens de l'axe. Écart = mesuré − théorique. Théorique = élément du plan le plus proche selon le code du point (sommet, ligne, ou intersection de la ligne avec un axe).${S.lx.length?' Alignement LandXML : PM selon le chaînage du fichier, EC théo = décalage prévu pour le code ; ΔZ sur une surface = Z mesuré − Z de la surface à la position mesurée.':''}</p>`;
   if(R.sketch && S.dxf) h+=`<h2>Croquis</h2>${sketchSVG(pts)}`;
   const zc = is3D ? '<th class="n">ΔZ mm</th>' : '';
   const zv = p => is3D ? `<td class="n">${p.res&&p.res.dZ!=null?smr(p.res.dZ):'—'}</td>` : '';
   if(R.group==='axis'){
-    const byAx=new Map(); const noAx=[];
+    const byAx=new Map(); let noAx=[];
     for(const p of pts){ if(p.axRes.length){ for(const a of p.axRes){ (byAx.get(a.id)||byAx.set(a.id,[]).get(a.id)).push({p,a}); } } else noAx.push(p); }
     const axes=[...byAx.keys()].map(axisById).sort((a,b)=>natCmp(a.name,b.name));
     if(axes.length) h+=`<h2>Écarts par axe</h2>`;
@@ -1280,6 +1520,22 @@ function reportBody(){
       const list=byAx.get(a.id).sort((u,v)=>u.a.pm-v.a.pm);
       h+=`<h3>Axe ${esc(a.name)} <span class="sub">— gisement ${gisement(a)}</span></h3><table><thead><tr><th>Point</th><th>Code</th><th class="n">PM (m)</th><th class="n">EC théo (m)</th><th class="n">EC mesuré (m)</th><th class="n">Écart (mm)</th>${zc}<th>Statut</th><th>Remarque</th></tr></thead><tbody>`;
       for(const {p,a:ar} of list) h+=`<tr class="${ar.st==='out'||ar.st==='doubt'?'bad':''}"><td class="pt">${esc(p.id)}</td><td>${esc(p.code)}</td><td class="n">${f3r(ar.pm)}</td><td class="n">${f3r(ar.ot)}</td><td class="n">${f3r(ar.om)}</td><td class="n"><b>${smr(ar.d)}</b></td>${zv(p)}<td>${stTxt(ar.st)}</td><td>${esc(p.note)}</td></tr>`;
+      h+=`</tbody></table>`;
+    }
+    const rte=noAx.filter(p=>p.res&&p.res.kind==='route'), srf=noAx.filter(p=>p.res&&p.res.kind==='surf');
+    noAx=noAx.filter(p=>!rte.includes(p)&&!srf.includes(p));
+    if(rte.length){
+      h+=`<h2>Écarts par alignement</h2>`;
+      for(const ln of [...new Set(rte.map(p=>p.res.layer))]){
+        const list=rte.filter(p=>p.res.layer===ln).sort((u,v)=>u.res.pm-v.res.pm);
+        h+=`<h3>Alignement ${esc(lxShort(ln))}</h3><table><thead><tr><th>Point</th><th>Code</th><th class="n">PM</th><th class="n">EC théo (m)</th><th class="n">EC mesuré (m)</th><th class="n">Écart (mm)</th>${zc}<th>Statut</th><th>Remarque</th></tr></thead><tbody>`;
+        for(const p of list){ const r=p.res; h+=`<tr class="${p.status==='out'||p.status==='doubt'?'bad':''}"><td class="pt">${esc(p.id)}</td><td>${esc(p.code)}</td><td class="n">${fmtPM(r.pm)}</td><td class="n">${f3r(r.ecTh)}</td><td class="n">${f3r(r.ecMes)}</td><td class="n"><b>${smr(r.ec)}</b></td>${zv(p)}<td>${stTxt(p.status)}</td><td>${esc([r.hors?'hors de l\'alignement':'',p.note].filter(Boolean).join(' · '))}</td></tr>`; }
+        h+=`</tbody></table>`;
+      }
+    }
+    if(srf.length){
+      h+=`<h2>Contrôle altimétrique par surface</h2><table><thead><tr><th>Point</th><th>Code</th><th>Surface</th><th class="n">PM</th><th class="n">EC (m)</th><th class="n">Z théo (m)</th><th class="n">Z mesuré (m)</th><th class="n">ΔZ (mm)</th><th>Statut</th><th>Remarque</th></tr></thead><tbody>`;
+      for(const p of [...srf].sort((u,v)=>(u.res.pm??Infinity)-(v.res.pm??Infinity)||natCmp(u.id,v.id))){ const r=p.res; h+=`<tr class="${p.status==='out'||p.status==='doubt'?'bad':''}"><td class="pt">${esc(p.id)}</td><td>${esc(p.code)}</td><td>${esc(lxShort(r.layer))}</td><td class="n">${r.pm!=null?fmtPM(r.pm):'—'}</td><td class="n">${r.ecMes!=null?f3r(r.ecMes):'—'}</td><td class="n">${r.zth!=null?f3r(r.zth):'hors surface'}</td><td class="n">${f3r(p.Z)}</td><td class="n"><b>${r.dZ!=null?smr(r.dZ):'—'}</b></td><td>${stTxt(p.status)}</td><td>${esc(p.note)}</td></tr>`; }
       h+=`</tbody></table>`;
     }
     if(noAx.length){
@@ -1290,10 +1546,10 @@ function reportBody(){
   } else {
     h+=`<h2>Écarts par point</h2><table><thead><tr><th>Point</th><th>Code</th><th>Référence</th><th class="n">PM (m)</th><th class="n">Théorique</th><th class="n">Mesuré</th><th class="n">Écart (mm)</th>${zc}<th>Statut</th></tr></thead><tbody>`;
     for(const p of pts){ const rr=refRows(p);
-      rr.forEach((r,i)=>{ const th = r.type==='axe'? 'EC '+f3r(r.th) : r.type==='ligne' ? 'EC 0.000' : '—';
-        const me = r.type==='axe'||r.type==='ligne' ? 'EC '+f3r(r.me) : r.type==='sommet' ? `ΔE ${smr(r.dE)} · ΔN ${smr(r.dN)}` : '—';
+      rr.forEach((r,i)=>{ const th = r.type==='axe'||r.type==='route'? 'EC '+f3r(r.th) : r.type==='ligne' ? 'EC 0.000' : r.type==='surf' ? 'Z '+f3r(r.th) : '—';
+        const me = r.type==='axe'||r.type==='ligne'||r.type==='route' ? 'EC '+f3r(r.me) : r.type==='surf' ? 'Z '+f3r(r.me) : r.type==='sommet' ? `ΔE ${smr(r.dE)} · ΔN ${smr(r.dN)}` : '—';
         const dv = r.type==='sommet' ? (r.d*1000).toFixed(1) : smr(r.d);
-        h+=`<tr class="${r.st==='out'||r.st==='doubt'?'bad':''}">${i===0?`<td class="pt" rowspan="${rr.length}">${esc(p.id)}</td><td rowspan="${rr.length}">${esc(p.code)}</td>`:''}<td>${esc(r.ref)}</td><td class="n">${r.pm!=null?f3r(r.pm):'—'}</td><td class="n">${th}</td><td class="n">${me}</td><td class="n"><b>${dv}</b></td>${i===0&&is3D?`<td class="n" rowspan="${rr.length}">${p.res&&p.res.dZ!=null?smr(p.res.dZ):'—'}</td>`:''}<td>${stTxt(r.st)}</td></tr>`; });
+        h+=`<tr class="${r.st==='out'||r.st==='doubt'?'bad':''}">${i===0?`<td class="pt" rowspan="${rr.length}">${esc(p.id)}</td><td rowspan="${rr.length}">${esc(p.code)}</td>`:''}<td>${esc(r.ref)}</td><td class="n">${r.pm!=null?(r.type==='route'||r.type==='surf'?fmtPM(r.pm):f3r(r.pm)):'—'}</td><td class="n">${th}</td><td class="n">${me}</td><td class="n"><b>${dv}</b></td>${i===0&&is3D?`<td class="n" rowspan="${rr.length}">${p.res&&p.res.dZ!=null?smr(p.res.dZ):'—'}</td>`:''}<td>${stTxt(r.st)}</td></tr>`; });
     }
     h+=`</tbody></table>`;
   }
@@ -1331,12 +1587,12 @@ function reportHTMLFile(){
 }
 function reportCSV(){
   const is3D=S.mode==='3D'; const n=n3c; const L=[];
-  L.push('Rapport d\'implantation'); L.push('Projet;'+csvCell(S.rep.projet)); L.push('Dossier;'+csvCell(S.rep.mandat)); L.push('Date;'+new Date().toLocaleDateString('fr-CA')); L.push('Plan;'+csvCell(S.dxf?S.dxf.name:'')); L.push('Tolérance plan (m);'+n(S.tol)); L.push('');
+  L.push('Rapport d\'implantation'); L.push('Projet;'+csvCell(S.rep.projet)); L.push('Dossier;'+csvCell(S.rep.mandat)); L.push('Date;'+new Date().toLocaleDateString('fr-CA')); L.push('Plan;'+csvCell(planNames())); L.push('Tolérance plan (m);'+n(S.tol)); L.push('');
   L.push(['Point','Code','Référence','PM (m)','EC théo (m)','EC mesuré (m)','ΔE (m)','ΔN (m)','Écart (m)',...(is3D?['ΔZ (m)']:[]),'Statut','Est','Nord','Z','Remarque'].join(';'));
-  for(const p of repPoints()) for(const r of refRows(p)) L.push([p.id,p.code,r.ref, n(r.pm), r.type==='ligne'?n(0):n(r.th), n(r.me), n(r.dE), n(r.dN), n(r.d), ...(is3D?[n(p.res&&p.res.dZ)]:[]), ({ok:'Conforme',out:'Hors tolérance',doubt:'Douteux',ex:'Exclu',nc:''})[r.st]||'', n(p.E), n(p.N), n(p.Z), p.note].map(csvCell).join(';'));
+  for(const p of repPoints()) for(const r of refRows(p)) L.push([p.id,p.code,r.ref, r.type==='route'||r.type==='surf'?(r.pm!=null?fmtPM(r.pm):''):n(r.pm), r.type==='ligne'?n(0):r.type==='surf'?'':n(r.th), r.type==='surf'?'':n(r.me), n(r.dE), n(r.dN), r.type==='surf'?'':n(r.d), ...(is3D?[n(p.res&&p.res.dZ)]:[]), ({ok:'Conforme',out:'Hors tolérance',doubt:'Douteux',ex:'Exclu',nc:''})[r.st]||'', n(p.E), n(p.N), n(p.Z), p.note].map(csvCell).join(';'));
   return '﻿'+L.join('\r\n');
 }
-function fileStem(){ return (S.dxf?S.dxf.name.replace(/\.dxf$/i,''):'implantation')+'_'+new Date().toISOString().slice(0,10); }
+function fileStem(){ return (S.dxf?S.dxf.name.replace(/\.(dxf|xml)$/i,''):'implantation')+'_'+new Date().toISOString().slice(0,10); }
 async function saveFile(filename,data,label){
   const r=await saveAny(filename,data);
   if(r==='ok'){ toast(label+' téléchargé : '+filename); return; }
@@ -1384,7 +1640,8 @@ function dossierData(note){
     format:'dossier-implantation', formatVersion:1, version, date, par,
     plan:S.dxf?S.dxf.name:null, leves:S.files.map(f=>({nom:f.name, ordre:f.order})),
     mode:S.mode, regles:{tol:S.tol,tolZ:S.tolZ,snap:S.snap,doubt:S.doubt,dup:S.dup,axisMax:S.axisMax},
-    codes:{calques:S.codeLayers, methodes:S.codeMethod, roles:S.codeRole, zConception:S.codeZ},
+    codes:{calques:S.codeLayers, methodes:S.codeMethod, roles:S.codeRole, zConception:S.codeZ, ecPrevus:S.codeEC},
+    landxml:S.lx.map(f=>f.name),
     axes:S.axes.map(({id,name,x1,y1,x2,y2,manual})=>({id,name,x1,y1,x2,y2,manual:!!manual})),
     points:collectPstate(), doublonsGardes:S.dupKeep,
     rapport:S.rep,
@@ -1397,7 +1654,7 @@ function applyDossier(d){
   if(d.plan && d.plan!==S.dxf.name) toast('Attention : ce dossier a été fait sur « '+d.plan+' »');
   if(d.regles) Object.assign(S, {tol:d.regles.tol??S.tol, tolZ:d.regles.tolZ??S.tolZ, snap:d.regles.snap??S.snap, doubt:d.regles.doubt??S.doubt, dup:d.regles.dup??S.dup, axisMax:d.regles.axisMax??S.axisMax});
   if(d.mode) { S.mode=d.mode==='3D'?'3D':'2D'; $('#m2d').setAttribute('aria-pressed',S.mode==='2D'); $('#m3d').setAttribute('aria-pressed',S.mode==='3D'); }
-  const c=d.codes||{}; S.codeLayers={...S.codeLayers,...(c.calques||{})}; S.codeMethod={...(c.methodes||{})}; S.codeRole={...(c.roles||{})}; S.codeZ={...(c.zConception||{})};
+  const c=d.codes||{}; S.codeLayers={...S.codeLayers,...(c.calques||{})}; S.codeMethod={...(c.methodes||{})}; S.codeRole={...(c.roles||{})}; S.codeZ={...(c.zConception||{})}; S.codeEC={...(c.ecPrevus||{})};
   S.axes=(d.axes||[]).filter(a=>isFinite(a.x1)&&isFinite(a.y2));
   S.pstate={...(d.points||{})}; S.dupKeep={...(d.doublonsGardes||{})};
   if(d.rapport) S.rep={...S.rep,...d.rapport};
@@ -1410,7 +1667,7 @@ async function saveDossier(quiet){
   if(!S.dxf){ toast('Ouvrez d\'abord le plan DXF'); return; }
   const d=dossierData();
   const data=JSON.stringify(d,null,1);
-  const name='dossier_'+S.dxf.name.replace(/\.dxf$/i,'')+'.json';
+  const name='dossier_'+S.dxf.name.replace(/\.(dxf|xml)$/i,'')+'.json';
   if(mandatActive()){
     const ex=await mandatReadDossier(name), mine=(S.dossier&&S.dossier.version)||0;
     if(ex && (ex.version||0)>mine && !confirm(`Une version plus récente de ce dossier existe dans le contrat :\nv${ex.version} du ${(ex.date||'').slice(0,10)}${ex.par?' par '+ex.par:''}.\n\nVous travaillez sur la v${mine}. Enregistrer quand même (vos réglages remplaceront la v${ex.version}) ?\n\nAnnuler, puis rouvrir le mandat, pour repartir de la v${ex.version}.`)) return;
@@ -1474,7 +1731,7 @@ $('#pane-axes').addEventListener('click',async e=>{
   if(t.id==='axClear'){ for(const p of ALL) if(S.sel.has(p.uid)) p.axes=[]; recompute(); return; }
   if(t.id==='axExport'){
     const data=JSON.stringify({plan:S.dxf.name, axes:S.axes.map(({id,name,x1,y1,x2,y2})=>({id,name,x1,y1,x2,y2}))},null,1);
-    const r=await saveAny('axes_'+S.dxf.name.replace(/\.dxf$/i,'')+'.json',data); if(r==='ok') toast('Axes exportés'); else if(r==='fail') copyText(data,'Axes copiés dans le presse-papiers');
+    const r=await saveAny('axes_'+S.dxf.name.replace(/\.(dxf|xml)$/i,'')+'.json',data); if(r==='ok') toast('Axes exportés'); else if(r==='fail') copyText(data,'Axes copiés dans le presse-papiers');
     return;
   }
   if(t.dataset.axrev){ const a=axisById(t.dataset.axrev); [a.x1,a.y1,a.x2,a.y2]=[a.x2,a.y2,a.x1,a.y1]; recompute(); return; }
@@ -1511,7 +1768,15 @@ function renderLayers(){
   const ls=Object.values(S.dxf.layers).filter(l=>l.segs.length||l.verts.length||l.texts.length).sort((a,b)=>a.name.localeCompare(b.name));
   $('#nLays').textContent=ls.length;
   const used=new Set(); for(const c in S.codeLayers) for(const n of S.codeLayers[c]) used.add(n);
-  let h=`<div class="actions"><button class="btn small" data-lall="1">Tout afficher</button><button class="btn small" data-lall="used">Seulement les calques associés</button></div><div class="laylist">`;
+  let h='';
+  for(const f of S.lx){
+    h+=`<div class="sect"><h4>LandXML · ${esc(f.name)}</h4>`;
+    for(const a of f.aligns){ const c={L:0,A:0,S:0}; a.els.forEach(e=>c[e.t]++); h+=`<p class="help"><b>Alignement ${esc(a.name)}</b> : PM ${fmtPM(a.sta0)} à ${fmtPM(a.sta0+a.len)} (${a.len.toFixed(3)} m) · ${c.L} droite(s), ${c.A} arc(s)${c.S?', '+c.S+' spirale(s)':''} · ${a.prof?'profil « '+esc(a.prof.name)+' » ('+a.prof.nodes.length+' PIV)':'sans profil en long'}</p>`; }
+    for(const sf of f.surfs) h+=`<p class="help"><b>Surface ${esc(sf.name)}</b> : ${sf.n} points · ${sf.T.length} triangles${sf.inv?' ('+sf.inv+' invisibles ignorés)':''}</p>`;
+    if(f.warn.length) h+=`<ul class="help" style="color:var(--doubt);margin:4px 0 0 18px">${f.warn.map(w=>`<li>${esc(w)}</li>`).join('')}</ul>`;
+    h+=`</div>`;
+  }
+  h+=`<div class="actions"><button class="btn small" data-lall="1">Tout afficher</button><button class="btn small" data-lall="used">Seulement les calques associés</button></div><div class="laylist">`;
   for(const l of ls){ h+=`<label><input type="checkbox" data-lon="${esc(l.name)}" ${S.layerOn[l.name]!==false?'checked':''}>${esc(l.name)}<span class="meta">${used.has(l.name)?'associé · ':''}${l.has3D?'3D · ':''}${(l.segs.length/6)|0} seg. · ${(l.verts.length/3)|0} sommets</span></label>`; }
   h+='</div>';
   $('#pane-layers').innerHTML=h;
@@ -1539,15 +1804,18 @@ function renderDetail(){
   let h=`<h3><span class="mono">${esc(p.id)}</span> ${pill(p.status)} ${p.dupGroup?'<span class="pill dup">doublon</span>':''}<button class="btn small" data-close style="margin-left:auto" aria-label="Fermer">×</button></h3>
     <div style="font-size:12.5px;color:var(--ink-2)">${esc(p.desc)||'<i>sans description</i>'} · ${esc(p.file)}</div>
     <dl class="kv"><dt>E</dt><dd>${f3(p.E)}</dd><dt>N</dt><dd>${f3(p.N)}</dd><dt>Z</dt><dd>${f3(p.Z)}</dd><dt>${r?'Calque':''}</dt><dd style="font-size:11px;overflow:hidden;text-overflow:ellipsis">${r?esc(r.layer):''}</dd>`;
-  if(r){ h+=`<dt>ΔE</dt><dd>${smm(r.dE)} mm</dd><dt>ΔN</dt><dd>${smm(r.dN)} mm</dd><dt>Écart</dt><dd><b>${mm(r.d)} mm</b></dd><dt>${r.kind==='line'?'EC':'Méth.'}</dt><dd>${r.kind==='line'?smm(r.ec)+' mm':'Sommet'}</dd>`;
-    if(is3D) h+=`<dt>Z théo</dt><dd>${r.zth!=null?f3(r.zth):'—'}</dd><dt>ΔZ</dt><dd>${r.dZ!=null?smm(r.dZ)+' mm':(r.zth==null?'pas de Z théo':'—')}</dd>`; }
+  if(r && r.kind==='route'){ h+=`<dt>PM</dt><dd><b>${fmtPM(r.pm)}</b></dd><dt>EC mes.</dt><dd>${f3(r.ecMes)} m</dd><dt>EC théo</dt><dd>${f3(r.ecTh)} m</dd><dt>Écart</dt><dd><b>${smm(r.ec)} mm</b>${r.hors?' · hors de l\'alignement':''}</dd><dt>ΔE</dt><dd>${smm(r.dE)} mm</dd><dt>ΔN</dt><dd>${smm(r.dN)} mm</dd>`; }
+  else if(r && r.kind==='surf'){ h+=`<dt>Contrôle</dt><dd>Altimétrique</dd>${r.pm!=null?`<dt>PM</dt><dd>${fmtPM(r.pm)}</dd><dt>EC</dt><dd>${f3(r.ecMes)} m</dd>`:''}${is3D?'':`<dt>Z</dt><dd>passez en 3D</dd>`}`; }
+  if(r && r.kind==='surf'){ if(is3D) h+=`<dt>Z théo</dt><dd>${r.zth!=null?f3(r.zth):'hors surface'}</dd><dt>ΔZ</dt><dd>${r.dZ!=null?'<b>'+smm(r.dZ)+' mm</b>':'—'}</dd>`; }
+  else if(r){ if(r.kind!=='route') h+=`<dt>ΔE</dt><dd>${smm(r.dE)} mm</dd><dt>ΔN</dt><dd>${smm(r.dN)} mm</dd><dt>Écart</dt><dd><b>${mm(r.d)} mm</b></dd><dt>${r.kind==='line'?'EC':'Méth.'}</dt><dd>${r.kind==='line'?smm(r.ec)+' mm':'Sommet'}</dd>`;
+    if(is3D) h+=`<dt>Z théo</dt><dd>${r.zth!=null?f3(r.zth):'—'}${r.zsrc&&r.zsrc!=='DXF'&&r.zsrc!=='Conception'?' <small>'+esc(r.zsrc)+'</small>':''}</dd><dt>ΔZ</dt><dd>${r.dZ!=null?smm(r.dZ)+' mm':(r.zout?'hors surface':r.zth==null?'pas de Z théo':'—')}</dd>`; }
   h+=`</dl>`;
   h+=`<label class="mini"><input type="checkbox" id="dRep" ${p.rep?'checked':''}> Inclure ce point au rapport d'implantation</label>`;
   if(S.axes.length){
     const near=nearAxes(p,null).slice(0,6); const ids=new Set(near.map(o=>o.a.id)); for(const id of p.axes) if(!ids.has(id)) near.unshift({a:axisById(id),d:Math.abs(axDist(p,axisById(id)).ec)});
     h+=`<div><div style="font-size:12px;color:var(--ink-2);margin-bottom:4px">Axes de référence <span style="color:var(--ink-3)">(touchez pour lier ; distance au point)</span></div><div class="axchips">${near.map(o=>`<button class="axchip" data-tax="${o.a.id}" aria-pressed="${p.axes.includes(o.a.id)}">${esc(o.a.name)}<small>${o.d.toFixed(2)} m</small></button>`).join('')||'<span class="help">Aucun axe à proximité</span>'}</div></div>`;
     if(p.axRes.length) h+=`<div class="axres">${p.axRes.map(a=>`<span>Axe ${esc(a.name)}</span><span>PM ${f3r(a.pm)} · EC théo ${f3r(a.ot)} · mes. ${f3r(a.om)} · <b>Δ ${a.d!=null?smm(a.d)+' mm':'—'}</b></span>`).join('')}</div>`;
-    else h+=`<div style="font-size:12px;color:var(--ink-3)">Sans axe : la référence est ${r?(r.kind==='line'?'la ligne':'le sommet')+' du calque '+esc(r.layer):'absente'}.</div>`;
+    else h+=`<div style="font-size:12px;color:var(--ink-3)">Sans axe : la référence est ${r?({line:'la ligne',vertex:'le sommet',route:'l\'alignement',surf:'la surface'})[r.kind]+' du calque '+esc(r.layer):'absente'}.</div>`;
   }
   if(p.ex) h+=`<div style="font-size:12.5px;color:var(--ink-2)">Exclu : ${esc(p.exMode==='out'?'manuellement':p.autoEx)}</div>`;
   if(p.dupGroup){ h+=`<div style="font-size:12.5px"><b>Mesures multiples :</b> ${p.dupMembers.map(q=>`<button class="btn small" data-keep="${esc(q.uid)}" ${q.ex?'':'aria-pressed="true"'} title="Garder ce point">${esc(q.id)} · ${q.res?mm(q.res.d)+' mm':''}</button>`).join(' ')}</div>`; }
@@ -1587,24 +1855,31 @@ $('#detail').addEventListener('change',e=>{
    ============================================================ */
 function readFile(f){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsText(f,'utf-8'); }); }
 async function addFiles(list){
-  let dxfLoaded=false, ptsLoaded=0;
-  if(S.example){ S.example=false; S.dxf=null; S.files=[]; S.codeLayers={}; S.codeMethod={}; S.dupKeep={}; S.axes=[]; S.pstate={}; ALL=[]; if(S.rep.projet==='Exemple – bâtiment fictif') S.rep.projet=''; }
-  const rank=f=>/\.dxf$/i.test(f.name)?0:/\.json$/i.test(f.name)?1:2;
+  let dxfLoaded=false, ptsLoaded=0, lxLoaded=[];
+  if(S.example){ S.example=false; S.dxf=null; S.lx=[]; S.files=[]; S.codeLayers={}; S.codeMethod={}; S.dupKeep={}; S.axes=[]; S.pstate={}; ALL=[]; if(S.rep.projet==='Exemple – bâtiment fictif') S.rep.projet=''; }
+  const rank=f=>/\.dxf$/i.test(f.name)?0:/\.(xml|landxml)$/i.test(f.name)?0.5:/\.json$/i.test(f.name)?1:2;
   list=[...list].sort((a,b)=>rank(a)-rank(b));
   let dos=null;
   for(const f of list){
     const txt=await readFile(f);
     if(/\.json$/i.test(f.name)){ try{ dos=JSON.parse(txt); }catch(_){ toast(f.name+' : JSON illisible'); } continue; }
+    if(/\.(xml|landxml)$/i.test(f.name) || /<LandXML[\s>]/.test(txt.slice(0,3000))){
+      try{ const lx=parseLandXML(txt,f.name); S.lx=S.lx.filter(x=>x.name!==f.name); S.lx.push(lx); lxLoaded.push(lx); }catch(err){ toast(f.name+' : '+err.message); }
+      continue; }
     if(/\.dxf$/i.test(f.name) || /^\s*0\s*[\r\n]+\s*SECTION/.test(txt.slice(0,200))){
       try{ S.dxf=parseDXF(txt,f.name); S.layerOn={}; dxfLoaded=true; S.axisSel=null; S.dossier=null; if(S.pendingDossier){ dos=dos||S.pendingDossier; S.pendingDossier=null; } else if(!loadProject()) detectAxes(); }catch(err){ toast('Lecture du DXF impossible : '+err.message); }
     } else { const pf=parsePoints(txt,f.name); if(pf.pts.length){ S.files.push(pf); ptsLoaded++; } else toast(f.name+' : aucun point reconnu (attendu : P,N,E,Z,D)'); }
   }
+  lxInject(); if(!dos && S.pendingDossier && S.dxf){ dos=S.pendingDossier; S.pendingDossier=null; }
   detectOrder(); buildAll(); autoMap(); recompute();
   if(dos){ try{ applyDossier(dos); }catch(_){ toast('Ce fichier n\'est pas un dossier d\'implantation'); } }
   fit();
-  if(dos) {} else if(dxfLoaded) toast('Plan chargé : '+Object.keys(S.dxf.layers).length+' calques · '+S.axes.length+' axes');
+  if(dos) {} else if(lxLoaded.length){ const na=lxLoaded.reduce((n,f)=>n+f.aligns.length,0), ns=lxLoaded.reduce((n,f)=>n+f.surfs.length,0), w=lxLoaded.flatMap(f=>f.warn);
+    toast('LandXML : '+na+' alignement'+(na>1?'s':'')+(na?' ('+lxLoaded.flatMap(f=>f.aligns).map(a=>fmtPM(a.sta0)+' à '+fmtPM(a.sta0+a.len)).join(', ')+')':'')+' · '+ns+' surface'+(ns>1?'s':'')+(w.length?' · '+w.length+' avertissement(s), voir Calques':'')); }
+  else if(dxfLoaded) toast('Plan chargé : '+Object.keys(S.dxf.layers).length+' calques · '+S.axes.length+' axes');
   else if(ptsLoaded) toast(ptsLoaded+' fichier(s) de points ajouté(s)');
 }
+$('#fLx').addEventListener('change',e=>{ if(e.target.files.length) addFiles([...e.target.files]); e.target.value=''; });
 $('#fDxf').addEventListener('change',e=>{ if(e.target.files.length) addFiles([...e.target.files]); e.target.value=''; });
 $('#fPts').addEventListener('change',e=>{ if(e.target.files.length) addFiles([...e.target.files]); e.target.value=''; });
 let dragDepth=0;
@@ -1732,7 +2007,7 @@ async function mandatContracts(){
 async function mandatScan(contrat){
   const cdir=await MANDAT.root.getDirectoryHandle(contrat);
   const plans=[];
-  for(const top of ['03_PLANS','02_IMPLANTATION','08_PARTAGE']){ try{ await walkFiles(await cdir.getDirectoryHandle(top),top,5,n=>/\.dxf$/i.test(n),plans,200); }catch(_){} }
+  for(const top of ['03_PLANS','02_IMPLANTATION','08_PARTAGE']){ try{ await walkFiles(await cdir.getDirectoryHandle(top),top,5,n=>/\.(dxf|xml)$/i.test(n),plans,200); }catch(_){} }
   plans.sort((a,b)=>natCmp(a.rel,b.rel));
   const dossiers=[]; let validOk=false;
   try{ const v=await subDir(cdir,VALID_PATH); validOk=true; for await(const [n,h] of v.entries()) if(h.kind==='file' && /^dossier_.*\.json$/i.test(n)) dossiers.push({h,name:n}); }catch(_){}
@@ -1770,10 +2045,10 @@ async function renderMandat(){
     if(!MANDAT.scan || MANDAT.scan.contrat!==cur){ el.innerHTML=h+`<p class="help">Lecture du contrat…</p>`; try{ MANDAT.scan={contrat:cur,...await mandatScan(cur)}; }catch(e){ el.innerHTML=h+`<p class="help">Lecture impossible : ${esc(e.message)}</p>`; return; } mSel={plan:null,leves:new Set(),replace:true,dossier:true}; }
     const sc=MANDAT.scan;
     if(mSel.plan==null && sc.plans.length){ const want=S.dxf?S.dxf.name:null; const i=sc.plans.findIndex(p=>p.name===want); mSel.plan=i>=0?i:(sc.plans.length===1?0:null); }
-    h+=`<div class="msect"><h4>3. Plan DXF <span class="ct">${sc.plans.length}</span></h4>${sc.plans.length?`<div class="mlist">${sc.plans.map((p,i)=>`<label><input type="radio" name="mPlan" value="${i}" ${mSel.plan===i?'checked':''}><span class="mono">${esc(p.rel)}</span></label>`).join('')}</div>`:`<p class="help">Aucun .dxf dans 03_PLANS, 02_IMPLANTATION ou 08_PARTAGE.</p>`}
+    h+=`<div class="msect"><h4>3. Plan DXF ou LandXML <span class="ct">${sc.plans.length}</span></h4>${sc.plans.length?`<div class="mlist">${sc.plans.map((p,i)=>`<label><input type="radio" name="mPlan" value="${i}" ${mSel.plan===i?'checked':''}><span class="mono">${esc(p.rel)}</span></label>`).join('')}</div>`:`<p class="help">Aucun .dxf ni .xml dans 03_PLANS, 02_IMPLANTATION ou 08_PARTAGE.</p>`}
       ${S.dxf?`<label class="mini"><input type="radio" name="mPlan" value="-1" ${mSel.plan===-1?'checked':''}>Garder le plan déjà ouvert (${esc(S.dxf.name)})</label>`:''}</div>`;
     const planName = mSel.plan>=0&&sc.plans[mSel.plan] ? sc.plans[mSel.plan].name : (S.dxf?S.dxf.name:null);
-    const dname = planName ? 'dossier_'+planName.replace(/\.dxf$/i,'')+'.json' : null;
+    const dname = planName ? 'dossier_'+planName.replace(/\.(dxf|xml)$/i,'')+'.json' : null;
     const dmatch = dname && sc.dossiers.find(d=>d.name.toLowerCase()===dname.toLowerCase());
     h+=`<div class="msect"><h4>4. Dossier partagé</h4><p class="help">${sc.validOk?'':'Le dossier <b>02_IMPLANTATION\\04_VALIDATION</b> n\'existe pas encore ; il sera créé au premier enregistrement. '}${dmatch?`<label class="mini"><input type="checkbox" id="mDos" ${mSel.dossier?'checked':''}>Ouvrir <b class="mono">${esc(dmatch.name)}</b> (dernière version, partagée par les arpenteurs)</label>`:dname?`Aucun dossier pour ce plan : il sera créé (<span class="mono">${esc(dname)}</span>).`:''}</p></div>`;
     const grps=[...new Set(sc.leves.map(l=>l.grp))];
@@ -1791,7 +2066,7 @@ async function mandatOpen(){
   const planName=plan?plan.name:S.dxf.name;
   try{
     if(plan) files.push(await plan.h.getFile());
-    const dname='dossier_'+planName.replace(/\.dxf$/i,'')+'.json';
+    const dname='dossier_'+planName.replace(/\.(dxf|xml)$/i,'')+'.json';
     const dm=sc.dossiers.find(d=>d.name.toLowerCase()===dname.toLowerCase());
     if(dm && mSel.dossier) files.push(await dm.h.getFile());
     for(const i of mSel.leves) files.push(await sc.leves[i].h.getFile());
@@ -1911,7 +2186,7 @@ async function deposerValidation(){
       arpenteur:S.rep.arpenteur, date:now.toISOString(), date_locale:now.toLocaleString('fr-CA'),
       mode:S.mode, tolerance_plan_mm:+(S.tol*1000).toFixed(1), tolerance_z_mm:S.mode==='3D'?+(S.tolZ*1000).toFixed(1):null,
       resultats:sm, remarques:S.rep.notes||'',
-      dossier_partage:S.dxf?'dossier_'+S.dxf.name.replace(/\.dxf$/i,'')+'.json':'', dossier_version:(S.dossier&&S.dossier.version)||null,
+      dossier_partage:S.dxf?'dossier_'+S.dxf.name.replace(/\.(dxf|xml)$/i,'')+'.json':'', dossier_version:(S.dossier&&S.dossier.version)||null,
       destinataires:dest.map(x=>x.courriel), destinataires_texte:dest.map(x=>x.courriel).join(';'),
       objet:`Validation d'implantation ${folder} – ${MANDAT.contrat} – ${sm.non_conformes?sm.non_conformes+' non conforme(s)':'conforme'}`
     };
